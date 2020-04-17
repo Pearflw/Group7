@@ -13,11 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+rm(list = ls())
 library(data.table)
-books <- fread('../input/books.csv')
-ratings <- fread('../input/ratings.csv')
-book_tags <- fread('../input/book_tags.csv')
-tags <- fread('../input/tags.csv')
+books <- fread('books.csv')
+ratings <- fread('ratings.csv')
+book_tags <- fread('book_tags.csv')
+tags <- fread('tags.csv')
 ```
 
 
