@@ -22,6 +22,39 @@ tags <- fread('../input/tags.csv')
 
 
 ```{r}
+#install.packages("readxl")
+library("readxl")
+books <- read_excel("all_books.xlsx")
+
+#select columns
+library(dplyr)
+books <- books %>% select(id, work_id, books_count,authors, original_publication_year, title, language_code, average_rating,	work_ratings_count)
+
+#clean language
+table(books$language_code)
+books$language_code[books$language_code == "en-CA"] <- "en"
+books$language_code[books$language_code == "en-GB"] <- "en"
+books$language_code[books$language_code == "en-US"] <- "en"
+books$language_code[books$language_code == "eng"] <- "en"
+
+library(ggpubr)
+theme_set(theme_pubr())
+
+temp <- within(books, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=TRUE))))
+ggplot(temp,aes(x=language_code))+geom_bar()
+ggplot(data.frame(temp), aes(x=language_code,fill=language_code)) +
+  geom_bar()+
+  labs(x = "language", title = "Including English") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")
+
+books_wo_english <-books[!grepl("en", books$language_code),]
+temp1 <- within(books_wo_english, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=TRUE))))
+ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
+  geom_bar()+
+  labs(x = "language", title = "Excluding English") +
+  theme_pubclean()+
+  theme(legend.position = "none")
 
 ```
 
