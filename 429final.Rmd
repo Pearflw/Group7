@@ -60,17 +60,13 @@ ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
 ```
 
 ```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
+#convert the ratings dataset into rating matrix
+library(tidyr)
+dimension_indices <- list(user_id = sort(unique(ratings$user_id)), book_id = sort(unique(ratings$book_id)))
+ratingmat <- spread(select(ratings, book_id, user_id, rating), book_id, rating) %>% select(-user_id) %>% as.matrix()
+dimnames(ratingmat) <- dimension_indices
+ratingmat[1:10, 1:10]
+dim(ratingmat)
 ```
 
 ```{r}
@@ -81,7 +77,6 @@ ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
 ```{r}
 
 ```
-
 
 ```{r}
 
@@ -104,7 +99,6 @@ ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
 ```{r}
 
 ```
-
 
 ```{r}
 
