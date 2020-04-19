@@ -25,6 +25,8 @@ tags <- fread('tags.csv')
 ```{r}
 #install.packages("readxl")
 library("readxl")
+library(gridExtra)
+library("stringr")
 books <- read_excel("all_books.xlsx")
 
 #select columns
@@ -101,7 +103,6 @@ genres <- merge(book_tags,tags,by="tag_id")
 goodreads_genres <-(c("Art", "Biography", "Business", "Chick Lit", "Children's", "Christian", "Classics", "Comics", "Contemporary", "Cookbooks", "Crime", "Ebooks", "Fantasy", "Fiction", "Gay and Lesbian", "Graphic Novels", "Historical Fiction", "History", "Horror", "Humor and Comedy", "Manga", "Memoir", "Music", "Mystery", "Nonfiction", "Paranormal", "Philosophy", "Poetry", "Psychology", "Religion", "Romance", "Science", "Science Fiction", "Self Help", "Suspense", "Spirituality", "Sports", "Thriller", "Travel", "Young Adult"))
 
 str_to_lower(goodreads_genres)  %in% genres$tag_name
-library("stringr")
 c <- goodreads_genres[str_to_lower(goodreads_genres)  %in% genres$tag_name]
 
 available_tags <- genres$tag_id[match(str_to_lower(c), genres$tag_name)]
@@ -130,6 +131,8 @@ plot4 <- ggplot(data.frame(temp5), aes(x=tag_name,fill=tag_name)) +
   theme(legend.position = "none")+
   coord_flip()
 par(mfrow=c(1,3))
+
+
 grid.arrange(plot3, plot4, ncol=2)
 
 #now use these last genres to match with the book dataset
