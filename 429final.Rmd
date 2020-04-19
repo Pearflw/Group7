@@ -29,7 +29,7 @@ books <- read_excel("all_books.xlsx")
 
 #select columns
 library(dplyr)
-books <- books %>% select(id, work_id, books_count,authors, original_publication_year, title, language_code, average_rating,	work_ratings_count)
+books <- books %>% select(id,book_id, work_id, books_count,authors, original_publication_year, title, language_code, average_rating,	work_ratings_count)
 
 #clean language
 table(books$language_code)
@@ -41,22 +41,103 @@ books$language_code[books$language_code == "eng"] <- "en"
 library(ggpubr)
 theme_set(theme_pubr())
 
-temp <- within(books, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=TRUE))))
+temp <- within(books, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
 ggplot(temp,aes(x=language_code))+geom_bar()
-ggplot(data.frame(temp), aes(x=language_code,fill=language_code)) +
+plot1 <-ggplot(data.frame(temp), aes(x=language_code,fill=language_code)) +
   geom_bar()+
   labs(x = "language", title = "Including English") +
   theme_pubclean()+ 
-  theme(legend.position = "none")
+  theme(legend.position = "none")+
+  coord_flip()
 
 books_wo_english <-books[!grepl("en", books$language_code),]
-temp1 <- within(books_wo_english, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=TRUE))))
-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
+temp1 <- within(books_wo_english, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
+plot2<-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
   geom_bar()+
   labs(x = "language", title = "Excluding English") +
   theme_pubclean()+
+  theme(legend.position = "none")+
+  coord_flip()
+
+grid.arrange(plot1, plot2, ncol=2)
+
+temp2 <- within(books, original_publication_year <- factor(original_publication_year,levels=names(sort(table(original_publication_year), decreasing=TRUE))))
+ggplot(temp,aes(x=original_publication_year))+geom_bar()
+ggplot(data.frame(temp), aes(x=original_publication_year,fill=original_publication_year)) +
+  geom_bar()+
+  labs(x = "year", title = "Publication Year") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")
+hist(books$original_publication_year)
+
+temp3 <- within(books, books_count <- factor(books_count,levels=names(sort(table(books_count), decreasing=TRUE))))
+ggplot(temp,aes(x=books_count))+geom_bar()
+ggplot(data.frame(temp), aes(x=books_count,fill=books_count)) +
+  geom_bar()+
+  labs(x = "books count", title = "Books Count") +
+  theme_pubclean()+ 
   theme(legend.position = "none")
 
+# original_publication_year
+hist(books$original_publication_year, col = "blue", main = "Publication year", xlab = " ")
+# book count
+hist(books$books_count, col = "blue", main = "Number of book editions", xlab = " ")
+# Average Rating of books
+hist(books$average_rating, col = "blue", main = "Average Rating", xlab = " ")
+
+hist(books$work_ratings_count, col = "blue", main = "Average Rating", xlab = " ")
+
+```
+
+
+```{r}
+#Genres
+#first merge book_tags and tags
+genres <- merge(book_tags,tags,by="tag_id")
+
+# 2 approaches to genres
+# use the genres provided by goodreads 
+
+goodreads_genres <-(c("Art", "Biography", "Business", "Chick Lit", "Children's", "Christian", "Classics", "Comics", "Contemporary", "Cookbooks", "Crime", "Ebooks", "Fantasy", "Fiction", "Gay and Lesbian", "Graphic Novels", "Historical Fiction", "History", "Horror", "Humor and Comedy", "Manga", "Memoir", "Music", "Mystery", "Nonfiction", "Paranormal", "Philosophy", "Poetry", "Psychology", "Religion", "Romance", "Science", "Science Fiction", "Self Help", "Suspense", "Spirituality", "Sports", "Thriller", "Travel", "Young Adult"))
+
+str_to_lower(goodreads_genres)  %in% genres$tag_name
+library("stringr")
+c <- goodreads_genres[str_to_lower(goodreads_genres)  %in% genres$tag_name]
+
+available_tags <- genres$tag_id[match(str_to_lower(c), genres$tag_name)]
+genres <- genres %>% filter(genres$tag_id %in% available_tags)
+#now the dataset contains a book with multiples tags but from the list above
+temp4 <- within(genres, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
+ggplot(temp4,aes(x=tag_name))+geom_bar()
+plot3 <- ggplot(data.frame(temp4), aes(x=tag_name,fill=tag_name)) +
+  geom_bar()+
+  labs(x = " ", title = "Allowing multiple genres") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")+
+  coord_flip()
+
+# select the most popular one
+require(data.table) 
+genres_temp <- as.data.table(genres)
+genres_temp <- genres_temp[genres_temp[, .I[which.max(count)], by=goodreads_book_id]$V1]
+
+temp5 <- within(genres_temp, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
+ggplot(temp5,aes(x=tag_name))+geom_bar()
+plot4 <- ggplot(data.frame(temp5), aes(x=tag_name,fill=tag_name)) +
+  geom_bar()+
+  labs(x = " ", title = "The most popular genre per") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")+
+  coord_flip()
+par(mfrow=c(1,3))
+grid.arrange(plot3, plot4, ncol=2)
+
+#now use these last genres to match with the book dataset
+final_genres <- genres_temp %>% select(goodreads_book_id, tag_id)
+names(final_genres)[names(final_genres) == "goodreads_book_id"] <- "book_id"
+
+#Final books dataset
+all_books <- merge(books,final_genres,by="book_id")
 ```
 
 ```{r}
