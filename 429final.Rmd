@@ -63,23 +63,6 @@ plot2<-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
 
 grid.arrange(plot1, plot2, ncol=2)
 
-temp2 <- within(books, original_publication_year <- factor(original_publication_year,levels=names(sort(table(original_publication_year), decreasing=TRUE))))
-ggplot(temp,aes(x=original_publication_year))+geom_bar()
-ggplot(data.frame(temp), aes(x=original_publication_year,fill=original_publication_year)) +
-  geom_bar()+
-  labs(x = "year", title = "Publication Year") +
-  theme_pubclean()+ 
-  theme(legend.position = "none")
-hist(books$original_publication_year)
-
-temp3 <- within(books, books_count <- factor(books_count,levels=names(sort(table(books_count), decreasing=TRUE))))
-ggplot(temp,aes(x=books_count))+geom_bar()
-ggplot(data.frame(temp), aes(x=books_count,fill=books_count)) +
-  geom_bar()+
-  labs(x = "books count", title = "Books Count") +
-  theme_pubclean()+ 
-  theme(legend.position = "none")
-
 # original_publication_year
 hist(books$original_publication_year, col = "blue", main = "Publication year", xlab = " ")
 # book count
@@ -156,7 +139,6 @@ dim(ratingmat)
 ```{r}
 
 ```
-
 
 ```{r}
 
