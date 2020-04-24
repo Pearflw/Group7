@@ -141,6 +141,111 @@ dim(ratingmat)
 ```
 
 ```{r}
+#Content Based Recommendation
+#reduce the dimensionaility of tags and creating the item profile
+#get the main categories from tags for each book
+main_tags_labels = c("art", "biography", "business", "chick Lit", "children's", "christian", "classics", "comics", "contemporary", "cookbooks", "crime", "ebooks", "fantasy", "fiction", "gay and lesbian", "graphic novels", "historical fiction", "history", "horror", "humor and comedy", "manga", "memoir", "music", "mystery", "nonfiction", "paranormal", "philosophy", "poetry", "psychology", "religion", "romance", "science", "science fiction", "self help", "suspense", "spirituality", "sports", "thriller", "travel", "young adult")
+#map two tables together by tag_id
+main_tags = merge(x=book_tags,y=tags,by="tag_id")
+#combine tags for the same book and the original tag data of 30,000 rows is reduced to 10,000 rows
+main_tags1 = main_tags[,.(tags = paste(tag_name,collapse=",")),.(goodreads_book_id)]
+#generate a book-genre matrix for each book
+for(j in main_tags_labels){
+  set(main_tags1,j = j,value = grepl(x = main_tags1$tags,pattern = j)*1)
+  print(j)
+}
+main_tags1[,tags:=NULL]
+bookDF = merge(x= books,y=main_tags1,by="goodreads_book_id")
+bookDF = bookDF[,-1,drop=FALSE]
+bookDF = bookDF[,-2:-9,drop=FALSE]
+bookDF = bookDF[,-3:-14,drop=FALSE]
+#take the first 50k data in this task due to the excessive computation time
+userDF <- ratings[1:50000]
+
+#cluster books based on their genre using k-means, set k = 5
+clusterBooks<-function(bookDF){
+  #get rid of book ids and titles
+  bookDF<-bookDF[,-(1:2)]
+  bookCluster<-kmeans(bookDF,5)
+  return(bookCluster)
+}
+#find all books with the associated ratings that selected user has watched
+UserInfo<-function(dat,id){
+  #Select all rows for the same user and keep the columns book_id & rating
+  a<-subset(dat, user_id==id,select=c(book_id, rating))
+  # allocate 0 to the cluster column
+  cluster<-0
+  activeUser <- data.frame(a[order(a$book_id),] ,cluster)
+  return(activeUser)
+}
+#assign to each book the corresponding cluster number
+UserBookCluster<-function(bookCluster, activeUser){
+  #create temporary dataframe to match cluster assignments to book_ids
+  df1<- data.frame(cbind(bookDF$book_id, clusterNum = bookCluster$cluster))
+  names(df1)<-c("book_id", "cluster")
+  #this matches the cluster number to the activeUser book id
+  activeUser$cluster<-df1[match(activeUser$book_id, df1$book_id),2]
+  return(activeUser)
+}
+#calculate for each cluster the average of the book ratings
+MeanClusterRating<-function(bookCluster, activeUser){
+  #aggregate() function is used along with the cluster memberships to determine variable means for each cluster in the original metric
+  like<-aggregate(activeUser$rating, by=list(cluster=activeUser$cluster), mean)
+  #if the max mean rating is below three it gives out the dummy value zero
+  if(max(like$x)<3){
+    like<-as.vector(0)
+    #else it gives out the cluster number of the max mean value
+  } else{
+    like<-as.vector(t(max(subset(like, x>=3, select=cluster))))
+  }
+  return(like)
+}
+#if there is no cluster with a rating of 3 or above, select at random 100 books
+GoodBooks<-function(like, bookCluster, bookDF){
+  #a temporary dataframe is created to get a list of all books and their associated clusters
+  df1<- data.frame(cbind(bookDF$book_id, clusterNum = bookCluster$cluster))
+  names(df1)<-c("book_id", "cluster")
+  #if like has the value zero it selects randomly 100 books
+  if(like==0){
+    recommend<-bookDf[sample.int(n = dim(bookDF)[1], size = 100), 1]
+  }
+  #else it selects all books from the winning max mean cluster
+  else{
+    recommend<-as.vector(t(subset(df1, cluster==like, select=book_id)))
+  }
+  return(recommend)
+}
+#finalise the final recommendation list
+RecommendedBooks<-function(bookDF, userDF, user_id){
+  #recall all functions
+  bookCluster<-clusterBooks(bookDF)
+  activeUser<-UserInfo(userDF, user_id)
+  activeUser<-UserBookCluster(bookCluster, activeUser)
+  like<-MeanClusterRating(bookCluster, activeUser)
+  recommend<-GoodBooks(like, bookCluster, bookDF)
+  # only select not yet watched books
+  recommend<-recommend[-activeUser$book_id]
+  # add book title
+  title<-bookDF[match(recommend,bookDF$book_id),2]
+  recommend<-data.frame(recommend,title)
+  return(recommend)
+}
+#make suggestion
+#set the specific user id and the number of suggestions as inputs
+suggestBooks<-function(bookDF, userDF, user_id, no_books){
+  #get suggestions
+  suggestions = RecommendedBooks(bookDF, userDF, user_id)
+  #select stated number of selections
+  suggestions = suggestions[1:no_books,]
+  writeLines("You may also like these books:")
+  #print suggestions
+  write.table(suggestions[2], row.names = FALSE, col.names = FALSE)
+}
+#try with an example: suggest 10 books to user whose ID is 1
+suggestBooks(bookDF, userDF, 1, 10)
+```
+
+```{r}
 #Apriori Algorithm
 
 library(arules)
