@@ -342,8 +342,9 @@ colnames(sparse_ratings)[1:10]
 ```{r}
 #find the best nn for UBCF method. Cross-validation produces more robust results and error estimates.
 ubcf<-data.frame()
-for (i in c(10,20,30,40,50,100)){
+set.seed(7)
   e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
+for (i in c(10,20,30,40,50,100)){
   ubcf_add<-data.frame(Nearest_Neighbours = 0, test_RMSE=0) 
   Rec.ubcf <- Recommender(getData(e, "train"), "UBCF", param=list( nn=i))
   #making predictions on the test data set
@@ -359,8 +360,9 @@ for (i in c(10,20,30,40,50,100)){
 
 #find the best k for IBCF method. Running this code takes about 15 mins.
 ibcf<-data.frame()
+set.seed(7)
+e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
 for (i in c(10,20,30,50,100,200,500,1000)){
-  e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
   ibcf_add<-data.frame(Nearest_Neighbours = 0, test_RMSE=0) 
   Rec.ibcf <- Recommender(getData(e, "train"), "IBCF", param=list( k=i))
   #making predictions on the test data set
@@ -378,6 +380,7 @@ for (i in c(10,20,30,50,100,200,500,1000)){
 ```{r}
 #find the best lambda for SVDF method. Running this code takes about 15 mins.
 SVDF<-data.frame()
+set.seed(7)
 e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
 for (i in c(0.001,0.003,0.005,0.007,0.01)){
   SVDF_add<-data.frame(lambda = 0, test_RMSE=0) 
@@ -413,12 +416,13 @@ for (i in c(1,2,3,5,7,10,15,20,30)){
   SVDF_N = rbind(SVDF_N,SVDF_add) 
 }  
 plot(SVDF_N,type="b")
-#the result shows we use lambda= 0.005
+#the result shows we use number of featrues = 10
 ```
 
 ```{r}
 #compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
+set.seed(7)
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
@@ -434,6 +438,7 @@ plot(results, ylim = c(0,2))
 
 ```{r}
 #you can use this code instead, takes only 5 mins
+set.seed(7)
 scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
@@ -448,7 +453,7 @@ plot(results, ylim = c(0,2))
 
 ```{r}
 #select some random user (from 1 to 2000) to do recommendation
-userForPrediction<-7
+userForPrediction<-99
 #record his/her real user_id
 Real_User_id <-dimension_indices[[1]][userForPrediction]
 ```
@@ -471,8 +476,8 @@ for (i in 1:5) {
   print(paste(b,artist,sep = " - "))
 }
 
-cat('For user with id',Real_User_id,':\n')
-cat('\n The best 5 books to recommend (Based on UBCF) are: \n')
+cat('\n For user with id',Real_User_id,':\n')
+cat('The best 5 books to recommend (Based on UBCF) are: \n')
 
 # Do prediction based on UBCF 
 
@@ -518,7 +523,7 @@ pred_SVDF <- predict ( r_recom_SVDF , r [userForPrediction] , type="ratings")
 top_SVDF <- getTopNLists(pred_SVDF, n=5)
 top_SVDF_list <- as(top_SVDF,"list")
 cat('For user with id',Real_User_id,':\n')
-cat('The best 5 books to recommend (Based on SVD)  are: \n')
+cat('The best 5 books to recommend (Based on FSVD)  are: \n')
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_SVDF_list[[1]][i]]) 
   artist <- unique(books$authors[books$id == top_SVDF_list[[1]][i]]) 
