@@ -237,7 +237,7 @@ suggestBooks<-function(bookDF, userDF, user_id, no_books){
   suggestions = RecommendedBooks(bookDF, userDF, user_id)
   #select stated number of selections
   suggestions = suggestions[1:no_books,]
-  writeLines("You may also like these movies:")
+  writeLines("You may also like these books:")
   #print suggestions
   write.table(suggestions[2], row.names = FALSE, col.names = FALSE)
 }
