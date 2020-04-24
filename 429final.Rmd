@@ -483,7 +483,7 @@ for (i in 1:5) {
 # predict 5 books based on FSVD
 # create the FSVD model
 
-r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=10,gamma=0.02,lambda=i,
+r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=10,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05))
 # do predictions
 pred_SVDF <- predict ( r_recom_SVDF , r [7] , type="ratings") 
@@ -500,8 +500,8 @@ for (i in 1:5) {
 
 ```{r}
 # to see the two matrix U and V, run the following code, takes 15 mins
-fsvd<- funkSVD(r, k = 10, gamma = 0.015, lambda = 0.001,
-  min_improvement = 1e-06, min_epochs = 50, max_epochs = 200,
+fsvd<- funkSVD(r, k = 10, gamma = 0.02, lambda = 0.005,
+  min_improvement = 1e-05, min_epochs = 20, max_epochs = 100,
   verbose = T)
 #fsvd$U
 #fsvd$V
