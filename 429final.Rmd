@@ -271,6 +271,26 @@ for (i in c(10,20,30,50,100,200,500,1000)){
 ```
 
 ```{r}
+#find the best lambda for SVDF method. Running this code takes about 15 mins.
+SVDF<-data.frame()
+e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
+for (i in c(0.001,0.003,0.005,0.007,0.01)){
+  SVDF_add<-data.frame(lambda = 0, test_RMSE=0) 
+  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=10,gamma=0.02,lambda=i,
+                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05))
+  #making predictions on the test data set
+  p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
+  # obtaining the error metrics for both approaches and comparing them
+  test_RMSE_ibcf <-calcPredictionAccuracy(p_SVDF_test, getData(e, "unknown")) 
+  SVDF_add$lambda <-i
+  SVDF_add$test_RMSE <- test_RMSE_ibcf[1]
+  SVDF = rbind(SVDF,SVDF_add) 
+}
+plot(SVDF,type="b")
+#the result shows we use lambda= 0.005
+```
+
+```{r}
 #compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
@@ -279,7 +299,8 @@ Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD" ,param=NULL ),
-                 "SVDF"= list(name="SVDF", param=NULL))
+                 "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
+                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
 #getConfusionMatrix(results)[[1]]
@@ -293,7 +314,8 @@ Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
-                 "SVDF"=list(name="SVDF", param=NULL))
+                 "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
+                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
 ```
@@ -355,8 +377,9 @@ for (i in 1:5) {
 ```{r}
 # predict 5 books based on FSVD
 # create the FSVD model
-# takes 15+ mins
-r_recom_SVDF <- Recommender ( r , method = "SVDF" , param=list(k=10,gamma=0.015,lambda=0.001,min_epochs=50,max_epochs=200,min_improvement=1e-06,verbose = T))
+
+r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=10,gamma=0.02,lambda=i,
+                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05))
 # do predictions
 pred_SVDF <- predict ( r_recom_SVDF , r [7] , type="ratings") 
 top_SVDF <- getTopNLists(pred_SVDF, n=5)
@@ -379,9 +402,6 @@ fsvd<- funkSVD(r, k = 10, gamma = 0.015, lambda = 0.001,
 #fsvd$V
 ```
 
-```{r}
-
-```
 
 ```{r}
 
