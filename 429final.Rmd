@@ -278,7 +278,8 @@ Algorithm <-list("UBCF_05"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_30"  = list(name="IBCF", param=list(k  = 200)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
-                 "SVD" = list(name="SVD", param=NULL))
+                 "SVD" = list(name="SVD" ,param=NULL ),
+                 "SVDF"= list(name="SVDF", param=NULL))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
 #getConfusionMatrix(results)[[1]]
@@ -291,7 +292,8 @@ Algorithm <-list("UBCF_05"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_30"  = list(name="IBCF", param=list(k  = 200)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
-                 "SVD" = list(name="SVD", param=NULL))
+                 "SVD" = list(name="SVD", param=NULL),
+                 "SVDF"=list(name="SVDF", param=NULL))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
 ```
@@ -335,7 +337,7 @@ for (i in 1:5) {
 
 ```{r}
 # predict 5 books based on SVD
-# create the SVD model
+# create the SVD model: (Recommender based on SVD approximation with column-mean imputation.)
 r_recom_SVD <- Recommender ( r , method = "SVD" , param=NULL)
 # do predictions
 pred_SVD <- predict ( r_recom_SVD , r [7] , type="ratings") 
@@ -346,6 +348,24 @@ cat('The best 5 books to recommend (Based on SVD)  are: \n')
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_SVD_list[[1]][i]]) 
   artist <- unique(books$authors[books$id == top_SVD_list[[1]][i]]) 
+  print(paste(b,artist,sep = " - "))
+}
+```
+
+```{r}
+# predict 5 books based on FSVD
+# create the FSVD model
+# takes 15+ mins
+r_recom_SVDF <- Recommender ( r , method = "SVDF" , param=list(k=10,gamma=0.015,lambda=0.001,min_epochs=50,max_epochs=200,min_improvement=1e-06,verbose = T))
+# do predictions
+pred_SVDF <- predict ( r_recom_SVDF , r [7] , type="ratings") 
+top_SVDF <- getTopNLists(pred_SVDF, n=5)
+top_SVDF_list <- as(top_SVDF,"list")
+
+cat('The best 5 books to recommend (Based on SVD)  are: \n')
+for (i in 1:5) {
+  b <- unique(books_with_id$book[books_with_id$book_id == top_SVDF_list[[1]][i]]) 
+  artist <- unique(books$authors[books$id == top_SVDF_list[[1]][i]]) 
   print(paste(b,artist,sep = " - "))
 }
 ```
