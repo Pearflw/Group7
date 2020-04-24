@@ -271,11 +271,11 @@ for (i in c(10,20,30,50,100,200,500,1000)){
 ```
 
 ```{r}
-#compare 4 methods :UBCF, IBCF, Popular, Random items
+#compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
-Algorithm <-list("UBCF_05"  = list(name="UBCF", param=list(nn = 20)),
-                 "IBCF_30"  = list(name="IBCF", param=list(k  = 200)),
+Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
+                 "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD" ,param=NULL ),
@@ -288,8 +288,8 @@ plot(results, ylim = c(0,2))
 ```{r}
 #you can use this code instead, takes only 5 mins
 scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
-Algorithm <-list("UBCF_05"  = list(name="UBCF", param=list(nn = 20)),
-                 "IBCF_30"  = list(name="IBCF", param=list(k  = 200)),
+Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
+                 "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
@@ -371,7 +371,12 @@ for (i in 1:5) {
 ```
 
 ```{r}
-
+# to see the two matrix U and V, run the following code, takes 15 mins
+fsvd<- funkSVD(r, k = 10, gamma = 0.015, lambda = 0.001,
+  min_improvement = 1e-06, min_epochs = 50, max_epochs = 200,
+  verbose = T)
+#fsvd$U
+#fsvd$V
 ```
 
 ```{r}
