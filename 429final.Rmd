@@ -396,6 +396,27 @@ plot(SVDF,type="b")
 ```
 
 ```{r}
+#find the best number of featrues for SVDF method. Running this code takes about 30 mins.
+SVDF_N<-data.frame()
+set.seed(7)
+e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
+for (i in c(1,2,3,5,7,10,15,20,30)){
+  SVDF_add<-data.frame(N_features = 0, test_RMSE=0) 
+  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=i,gamma=0.02,lambda=0.005,
+                                                                  min_epochs=1,max_epochs=100,min_improvement=1e-05,verbose=T))
+  #making predictions on the test data set
+  p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
+  # obtaining the error metrics for both approaches and comparing them
+  test_RMSE_ibcf <-calcPredictionAccuracy(p_SVDF_test, getData(e, "unknown")) 
+  SVDF_add$N_features <-i
+  SVDF_add$test_RMSE <- test_RMSE_ibcf[1]
+  SVDF_N = rbind(SVDF_N,SVDF_add) 
+}  
+plot(SVDF_N,type="b")
+#the result shows we use lambda= 0.005
+```
+
+```{r}
 #compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
@@ -426,17 +447,23 @@ plot(results, ylim = c(0,2))
 ```
 
 ```{r}
-#select some user 7 to do recommendation
+#select some random user (from 1 to 2000) to do recommendation
+userForPrediction<-7
+#record his/her real user_id
+Real_User_id <-dimension_indices[[1]][userForPrediction]
+```
 
-# Do prediction based on IBCF 
 
+```{r}
+# Do prediction based on IBCF
 r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 200))
 
 # predict 5 books based on IBCF
-pred_IBCF <- predict ( r_recom_IBCF , r [7] , type="ratings") 
+pred_IBCF <- predict ( r_recom_IBCF , r [userForPrediction] , type="ratings") 
 top_ibcf <- getTopNLists(pred_IBCF, n=5)
 top_IBCF_list <- as(top_ibcf,"list")
 
+cat('For user with id',Real_User_id,':\n')
 cat('The best 5 books to recommend (Based on IBCF)  are: \n')
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_IBCF_list[[1]][i]]) 
@@ -444,13 +471,14 @@ for (i in 1:5) {
   print(paste(b,artist,sep = " - "))
 }
 
+cat('For user with id',Real_User_id,':\n')
 cat('\n The best 5 books to recommend (Based on UBCF) are: \n')
 
 # Do prediction based on UBCF 
 
 r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 20))
 # predict 5 books based on UBCF
-pred_UBCF <- predict ( r_recom_UBCF , r [7] , type="ratings") 
+pred_UBCF <- predict ( r_recom_UBCF , r [userForPrediction] , type="ratings") 
 top.ubcf <- getTopNLists(pred_UBCF, n=5)
 top_UBCF_list<-as ( top.ubcf , "list" )
 
@@ -467,10 +495,10 @@ for (i in 1:5) {
 # create the SVD model: (Recommender based on SVD approximation with column-mean imputation.)
 r_recom_SVD <- Recommender ( r , method = "SVD" , param=NULL)
 # do predictions
-pred_SVD <- predict ( r_recom_SVD , r [7] , type="ratings") 
+pred_SVD <- predict ( r_recom_SVD , r [userForPrediction] , type="ratings") 
 top_SVD <- getTopNLists(pred_SVD, n=5)
 top_SVD_list <- as(top_SVD,"list")
-
+cat('For user with id',Real_User_id,':\n')
 cat('The best 5 books to recommend (Based on SVD)  are: \n')
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_SVD_list[[1]][i]]) 
@@ -486,10 +514,10 @@ for (i in 1:5) {
 r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=10,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05))
 # do predictions
-pred_SVDF <- predict ( r_recom_SVDF , r [7] , type="ratings") 
+pred_SVDF <- predict ( r_recom_SVDF , r [userForPrediction] , type="ratings") 
 top_SVDF <- getTopNLists(pred_SVDF, n=5)
 top_SVDF_list <- as(top_SVDF,"list")
-
+cat('For user with id',Real_User_id,':\n')
 cat('The best 5 books to recommend (Based on SVD)  are: \n')
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_SVDF_list[[1]][i]]) 
