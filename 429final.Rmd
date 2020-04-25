@@ -344,8 +344,10 @@ colnames(sparse_ratings)[1:10]
 #find the best nn for UBCF method. Cross-validation produces more robust results and error estimates.
 ubcf<-data.frame()
 set.seed(7)
-  e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
+cat('running for nn =')
+e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
 for (i in c(10,20,30,40,50,100)){
+  cat(i,'--')
   ubcf_add<-data.frame(Nearest_Neighbours = 0, test_RMSE=0) 
   Rec.ubcf <- Recommender(getData(e, "train"), "UBCF", param=list( nn=i))
   #making predictions on the test data set
@@ -356,14 +358,17 @@ for (i in c(10,20,30,40,50,100)){
   ubcf_add$test_RMSE <- test_RMSE_ubcf[1]
   ubcf = rbind(ubcf,ubcf_add) 
 }
+plot(ubcf,type="b")
 
 #the result shows we use nn =20
 
 #find the best k for IBCF method. Running this code takes about 15 mins.
 ibcf<-data.frame()
 set.seed(7)
+cat('running for k =')
 e <- evaluationScheme(r, method="cross-validation", k=10, given=-5)
-for (i in c(10,20,30,50,100,200,500,1000)){
+for (i in c(20,30,50,100,200,500,1000,2000)){
+  cat(i,'--')
   ibcf_add<-data.frame(Nearest_Neighbours = 0, test_RMSE=0) 
   Rec.ibcf <- Recommender(getData(e, "train"), "IBCF", param=list( k=i))
   #making predictions on the test data set
@@ -374,7 +379,8 @@ for (i in c(10,20,30,50,100,200,500,1000)){
   ibcf_add$test_RMSE <- test_RMSE_ibcf[1]
   ibcf = rbind(ibcf,ibcf_add) 
 }
-#the result shows we use k =200
+plot(ibcf,type="b")
+#the result shows we use k =2000
 
 ```
 
@@ -426,7 +432,7 @@ plot(SVDF_N,type="b")
 set.seed(7)
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
-                 "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
+                 "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD" ,param=NULL ),
@@ -442,7 +448,7 @@ plot(results, ylim = c(0,2))
 set.seed(7)
 scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
-                 "IBCF_200"  = list(name="IBCF", param=list(k  = 200)),
+                 "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "popular"  = list(name="POPULAR", param=NULL),
                  "random items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
@@ -462,7 +468,7 @@ Real_User_id <-dimension_indices[[1]][userForPrediction]
 
 ```{r}
 # Do prediction based on IBCF
-r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 200))
+r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 2000))
 
 # predict 5 books based on IBCF
 pred_IBCF <- predict ( r_recom_IBCF , r [userForPrediction] , type="ratings") 
