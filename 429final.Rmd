@@ -153,7 +153,7 @@ main_tags1 = main_tags[,.(tags = paste(tag_name,collapse=",")),.(goodreads_book_
 #generate a book-genre matrix for each book
 for(j in main_tags_labels){
   set(main_tags1,j = j,value = grepl(x = main_tags1$tags,pattern = j)*1)
-  print(j)
+  #print(j)
 }
 main_tags1[,tags:=NULL]
 bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
