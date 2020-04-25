@@ -142,6 +142,7 @@ dim(ratingmat)
 
 ```{r}
 #Content Based Recommendation
+books_1 <- fread('books.csv')
 #reduce the dimensionaility of tags and creating the item profile
 #get the main categories from tags for each book
 main_tags_labels = c("art", "biography", "business", "chick Lit", "children's", "christian", "classics", "comics", "contemporary", "cookbooks", "crime", "ebooks", "fantasy", "fiction", "gay and lesbian", "graphic novels", "historical fiction", "history", "horror", "humor and comedy", "manga", "memoir", "music", "mystery", "nonfiction", "paranormal", "philosophy", "poetry", "psychology", "religion", "romance", "science", "science fiction", "self help", "suspense", "spirituality", "sports", "thriller", "travel", "young adult")
@@ -155,7 +156,7 @@ for(j in main_tags_labels){
   print(j)
 }
 main_tags1[,tags:=NULL]
-bookDF = merge(x= books,y=main_tags1,by="goodreads_book_id")
+bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
 bookDF = bookDF[,-1,drop=FALSE]
 bookDF = bookDF[,-2:-9,drop=FALSE]
 bookDF = bookDF[,-3:-14,drop=FALSE]
