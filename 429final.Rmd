@@ -433,9 +433,9 @@ set.seed(7)
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
-                 "popular"  = list(name="POPULAR", param=NULL),
-                 "random items" = list(name="RANDOM", param=NULL),
-                 "SVD" = list(name="SVD" ,param=NULL ),
+                 "Popular"  = list(name="POPULAR", param=NULL),
+                 "Random Items" = list(name="RANDOM", param=NULL),
+                 "SVD" = list(name="SVD", param=NULL),
                  "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
@@ -449,8 +449,8 @@ set.seed(7)
 scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
 Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
-                 "popular"  = list(name="POPULAR", param=NULL),
-                 "random items" = list(name="RANDOM", param=NULL),
+                 "Popular"  = list(name="POPULAR", param=NULL),
+                 "Random Items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
                  "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05)))
