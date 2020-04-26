@@ -360,7 +360,7 @@ for (i in c(10,20,30,40,50,100)){
 }
 plot(ubcf,type="b")
 
-#the result shows we use nn =20
+#the result shows we use nn =40
 
 #find the best k for IBCF method. Running this code takes about 15 mins.
 ibcf<-data.frame()
@@ -410,7 +410,28 @@ plot(SVDF,type="b")
 SVDF_N<-data.frame()
 set.seed(7)
 e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
-for (i in c(1,2,3,5,7,10,15,20,30)){
+for (i in c(1,3,5,7,10,13,14,15,16,17,20,30)){
+  SVDF_add<-data.frame(N_features = 0, test_RMSE=0) 
+  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=i,gamma=0.02,lambda=0.005,
+                                                                  min_epochs=1,max_epochs=100,min_improvement=1e-05,verbose=T))
+  #making predictions on the test data set
+  p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
+  # obtaining the error metrics for both approaches and comparing them
+  test_RMSE_ibcf <-calcPredictionAccuracy(p_SVDF_test, getData(e, "unknown")) 
+  SVDF_add$N_features <-i
+  SVDF_add$test_RMSE <- test_RMSE_ibcf[1]
+  SVDF_N = rbind(SVDF_N,SVDF_add) 
+}  
+plot(SVDF_N,type="b")
+#the result shows we use number of featrues = 16
+```
+
+```{r}
+#find the best number of featrues for SVDF method. Running this code takes about 30 mins.
+SVDF_N<-data.frame()
+set.seed(7)
+e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
+for (i in c(13,14,15,16,17,20)){
   SVDF_add<-data.frame(N_features = 0, test_RMSE=0) 
   Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=i,gamma=0.02,lambda=0.005,
                                                                   min_epochs=1,max_epochs=100,min_improvement=1e-05,verbose=T))
@@ -431,12 +452,12 @@ plot(SVDF_N,type="b")
 #Running this code takes about 15-20 mins.
 set.seed(7)
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
-Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
+Algorithm <-list("UBCF_40"  = list(name="UBCF", param=list(nn = 40)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "Popular"  = list(name="POPULAR", param=NULL),
                  "Random Items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
-                 "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
+                 "SVDF"=list(name="SVDF", param=list(k=16,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
@@ -447,12 +468,12 @@ plot(results, ylim = c(0,2))
 #you can use this code instead, takes only 5 mins
 set.seed(7)
 scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
-Algorithm <-list("UBCF_20"  = list(name="UBCF", param=list(nn = 20)),
+Algorithm <-list("UBCF_40"  = list(name="UBCF", param=list(nn = 40)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "Popular"  = list(name="POPULAR", param=NULL),
                  "Random Items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
-                 "SVDF"=list(name="SVDF", param=list(k=10,gamma=0.02,lambda=0.005,
+                 "SVDF"=list(name="SVDF", param=list(k=16,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
 plot(results, ylim = c(0,2))
@@ -488,7 +509,7 @@ cat('The best 5 books to recommend (Based on UBCF) are: \n')
 
 # Do prediction based on UBCF 
 
-r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 20))
+r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 40))
 # predict 5 books based on UBCF
 pred_UBCF <- predict ( r_recom_UBCF , r [userForPrediction] , type="ratings") 
 top.ubcf <- getTopNLists(pred_UBCF, n=5)
@@ -523,7 +544,7 @@ for (i in 1:5) {
 # predict 5 books based on FSVD
 # create the FSVD model
 
-r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=10,gamma=0.02,lambda=0.005,
+r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=16,gamma=0.02,lambda=0.005,
                                                                   min_epochs=20,max_epochs=100,min_improvement=1e-05))
 # do predictions
 pred_SVDF <- predict ( r_recom_SVDF , r [userForPrediction] , type="ratings") 
@@ -540,7 +561,7 @@ for (i in 1:5) {
 
 ```{r}
 # to see the two matrix U and V, run the following code, takes 15 mins
-fsvd<- funkSVD(r, k = 10, gamma = 0.02, lambda = 0.005,
+fsvd<- funkSVD(r, k = 16, gamma = 0.02, lambda = 0.005,
   min_improvement = 1e-05, min_epochs = 20, max_epochs = 100,
   verbose = T)
 #fsvd$U
@@ -549,11 +570,35 @@ fsvd<- funkSVD(r, k = 10, gamma = 0.02, lambda = 0.005,
 
 
 ```{r}
+scheme <- evaluationScheme(r, method="split", 0.8 , given=-5,  goodRating=5)
 
+results_IBCF <- evaluate(scheme, method="IBCF",param=list(k  = 2000), type = "topNList",  n=c(3,5,10,15,20))
+results_UBCF <- evaluate(scheme, method="UBCF",param=list(nn = 40)  , type = "topNList",  n=c(3,5,10,15,20))
+results_SVDF <- evaluate(scheme, method="SVDF",param=list(k=16,gamma=0.02,lambda=0.005,
+                                                          min_epochs=20,max_epochs=100,min_improvement=1e-05),
+                         type = "topNList",  n=c(3,5,10,15,20))
+cat('The performance of IBCF is : \n')
+getConfusionMatrix(results_IBCF)[[1]]
+cat('\nThe performance of UBCF is : \n')
+getConfusionMatrix(results_UBCF)[[1]]
+cat('\nThe performance of SVDF is : \n')
+getConfusionMatrix(results_SVDF)[[1]]
 ```
 
 ```{r}
+table<- as.data.frame(getConfusionMatrix(results_SVDF)[[1]][,c('precision','recall'),drop=F])
+table <- cbind(table,n=as.numeric(rownames(table)))
+table
 
+plot(table$n,table$precision,col='red',type="b",ylim=c(0,0.08),xlab = "n",ylab ="precision")
+lines(table$n,table$recall,col='blue',type="b")
+legend("topright",pch=c(15,15),legend=c("precision","recall"),col=c('red','blue'),bty="n")
+
+ggplot()+geom_line(data = table,aes(x = n,y = precision,colour = "precision"),size=1)+
+  geom_point(data = table,aes(x = n,y = precision,colour = "precision"),size=2)+
+  geom_line(data = table,aes(x = n,y = recall,colour ="recall"),size=1) + 
+  geom_point(data = table,aes(x = n,y = recall,colour = "recall"),size=2) +
+   xlab("N")+ylab("Rate")
 ```
 
 
