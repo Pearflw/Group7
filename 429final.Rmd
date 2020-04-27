@@ -142,6 +142,10 @@ dim(ratingmat)
 
 ```{r}
 #Content Based Recommendation
+books_1 <- fread('books.csv')
+ratings = fread('ratings.csv')
+book_tags = fread('book_tags.csv')
+tags = fread('tags.csv')
 #reduce the dimensionaility of tags and creating the item profile
 #get the main categories from tags for each book
 main_tags_labels = c("art", "biography", "business", "chick Lit", "children's", "christian", "classics", "comics", "contemporary", "cookbooks", "crime", "ebooks", "fantasy", "fiction", "gay and lesbian", "graphic novels", "historical fiction", "history", "horror", "humor and comedy", "manga", "memoir", "music", "mystery", "nonfiction", "paranormal", "philosophy", "poetry", "psychology", "religion", "romance", "science", "science fiction", "self help", "suspense", "spirituality", "sports", "thriller", "travel", "young adult")
@@ -155,7 +159,7 @@ for(j in main_tags_labels){
   #print(j)
 }
 main_tags1[,tags:=NULL]
-bookDF = merge(x= books,y=main_tags1,by="goodreads_book_id")
+bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
 bookDF = bookDF[,-1,drop=FALSE]
 bookDF = bookDF[,-2:-9,drop=FALSE]
 bookDF = bookDF[,-3:-14,drop=FALSE]
@@ -178,12 +182,13 @@ userDF <- ratings
 
 #cluster books based on their genre using k-means, set k = 5
 clusterBooks<-function(bookDF){
+  set.seed(11)
   #get rid of book ids and titles
   bookDF<-bookDF[,-(1:2)]
   bookCluster<-kmeans(bookDF,5)
   return(bookCluster)
 }
-#find all books with the associated ratings that selected user has watched
+#find all books with the associated ratings that selected user has read
 UserInfo<-function(dat,id){
   #Select all rows for the same user and keep the columns book_id & rating
   a<-subset(dat, user_id==id,select=c(book_id, rating))
@@ -237,7 +242,7 @@ RecommendedBooks<-function(bookDF, userDF, user_id){
   activeUser<-UserBookCluster(bookCluster, activeUser)
   like<-MeanClusterRating(bookCluster, activeUser)
   recommend<-GoodBooks(like, bookCluster, bookDF)
-  # only select not yet watched books
+  # only select not yet read books
   recommend<-recommend[-activeUser$book_id]
   # add book title
   title<-bookDF[match(recommend,bookDF$book_id),2]
