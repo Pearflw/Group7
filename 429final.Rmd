@@ -160,8 +160,24 @@ bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
 bookDF = bookDF[,-1,drop=FALSE]
 bookDF = bookDF[,-2:-9,drop=FALSE]
 bookDF = bookDF[,-3:-14,drop=FALSE]
-#take the first 50k data in this task due to the excessive computation time
-userDF <- ratings[1:50000]
+
+#To eliminate running time, we sample the ratings dataset with the top 2000 books and the top 2,000 users
+ratings <- fread('ratings.csv')
+
+#Creating a subset with the top 2000 books and the top 2,000 users
+x = head(data.frame(table(ratings$book_id) %>% sort(decreasing =T)), 2002)
+colnames(x) = c("book_id", "Popularity(Number of ratings)")
+#is(x$book_id[1])
+x$book_id<-as.numeric(as.character(x$book_id))
+the_books = merge(ratings, x, by="book_id")
+
+y = head(data.frame(table(the_books$user_id) %>% sort(decreasing =T)), 2000) 
+colnames(y) = c("user_id", "Number of books this user rated")
+y$user_id <- as.numeric(as.character(y$user_id))
+ratings1 = merge(the_books, y, by="user_id")
+ratings<-ratings1[,1:3]
+
+userDF <- ratings
 
 #cluster books based on their genre using k-means, set k = 5
 clusterBooks<-function(bookDF){
@@ -242,8 +258,8 @@ suggestBooks<-function(bookDF, userDF, user_id, no_books){
   #print suggestions
   write.table(suggestions[2], row.names = FALSE, col.names = FALSE)
 }
-#try with an example: suggest 10 books to user whose ID is 1
-suggestBooks(bookDF, userDF, 1, 10)
+#try with an example: suggest 10 books to user whose ID is 2304
+suggestBooks(bookDF, userDF, 2304, 10)
 ```
 
 ```{r}
@@ -295,8 +311,6 @@ books_with_id=select(aaa,book_id,book)
 
 #To eliminate running time, we sample the ratings dataset with the top 2000 books and the top 2,000 users
 ratings <- fread('ratings.csv')
-#ratings$book_id<-as.factor(ratings$book_id)
-#ratings$user_id<-as.factor(ratings$user_id)
 
 #Creating a subset with the top 2000 books and the top 2,000 users
 x = head(data.frame(table(ratings$book_id) %>% sort(decreasing =T)), 2002)
