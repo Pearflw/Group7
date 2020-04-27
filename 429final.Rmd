@@ -8,11 +8,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-#install.packages('data.table')
-```
-
-
-```{r}
 rm(list = ls())
 library(data.table)
 books <- fread('books.csv')
@@ -131,19 +126,37 @@ all_books <- merge(books,final_genres,by="book_id")
 ```
 
 ```{r}
-#convert the ratings dataset into rating matrix
-library(tidyr)
-dimension_indices <- list(user_id = sort(unique(ratings$user_id)), book_id = sort(unique(ratings$book_id)))
-ratingmat <- spread(select(ratings, book_id, user_id, rating), book_id, rating) %>% select(-user_id) %>% as.matrix()
-dimnames(ratingmat) <- dimension_indices
-ratingmat[1:10, 1:10]
-dim(ratingmat)
+#To eliminate running time, we sample the ratings dataset with the top 2000 books and the top 2,000 users
+#Creating a subset with the top 2000 books and the top 2,000 users
+x = head(data.frame(table(ratings$book_id) %>% sort(decreasing =T)), 2002)
+colnames(x) = c("book_id", "Popularity(Number of ratings)")
+#is(x$book_id[1])
+x$book_id<-as.numeric(as.character(x$book_id))
+the_books = merge(ratings, x, by="book_id")
+
+y = head(data.frame(table(the_books$user_id) %>% sort(decreasing =T)), 2000) 
+colnames(y) = c("user_id", "Number of books this user rated")
+y$user_id <- as.numeric(as.character(y$user_id))
+ratings1 = merge(the_books, y, by="user_id")
+ratings<-ratings1[,1:3]
+
+#input ourselves into the rating dataset
+user_c <- head(ratings,20)
+user_c$user_id= 66666
+user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
+user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
+
+user_y <- head(ratings,20)
+user_y$user_id= 77777
+user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
+user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
+
+ratings<-rbind(ratings,user_c,user_y)
 ```
 
 ```{r}
 #Content Based Recommendation
 books_1 <- fread('books.csv')
-ratings = fread('ratings.csv')
 book_tags = fread('book_tags.csv')
 tags = fread('tags.csv')
 #reduce the dimensionaility of tags and creating the item profile
@@ -163,20 +176,6 @@ bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
 bookDF = bookDF[,-1,drop=FALSE]
 bookDF = bookDF[,-2:-9,drop=FALSE]
 bookDF = bookDF[,-3:-14,drop=FALSE]
-
-#To eliminate running time, we sample the ratings dataset with the top 2000 books and the top 2,000 users
-#Creating a subset with the top 2000 books and the top 2,000 users
-x = head(data.frame(table(ratings$book_id) %>% sort(decreasing =T)), 2002)
-colnames(x) = c("book_id", "Popularity(Number of ratings)")
-#is(x$book_id[1])
-x$book_id<-as.numeric(as.character(x$book_id))
-the_books = merge(ratings, x, by="book_id")
-
-y = head(data.frame(table(the_books$user_id) %>% sort(decreasing =T)), 2000) 
-colnames(y) = c("user_id", "Number of books this user rated")
-y$user_id <- as.numeric(as.character(y$user_id))
-ratings1 = merge(the_books, y, by="user_id")
-ratings<-ratings1[,1:3]
 
 userDF <- ratings
 
@@ -256,9 +255,10 @@ suggestBooks<-function(bookDF, userDF, user_id, no_books){
   suggestions = RecommendedBooks(bookDF, userDF, user_id)
   #select stated number of selections
   suggestions = suggestions[1:no_books,]
+  cat("For use with id",user_id,':\n')
   writeLines("You may also like these books:")
   #print suggestions
-  write.table(suggestions[2], row.names = FALSE, col.names = FALSE)
+  write.table(suggestions, row.names = FALSE, col.names = FALSE)
 }
 #try with an example: suggest 10 books to user whose ID is 2304
 suggestBooks(bookDF, userDF, 2304, 10)
@@ -268,13 +268,27 @@ suggestBooks(bookDF, userDF, 2304, 10)
 #Apriori Algorithm
 
 library(arules)
-ratings <- fread('ratings.csv')
+ratings_full <- fread('ratings.csv')
+
+#input ourselves into the rating dataset
+user_c <- head(ratings_full,20)
+user_c$user_id= 66666
+user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
+user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
+
+user_y <- head(ratings_full,20)
+user_y$user_id= 77777
+user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
+user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
+
+ratings_full<-rbind(ratings_full,user_c,user_y)
+
 aaa=books
 colnames(aaa)[2]='goodreads_book_ID'
 colnames(aaa)[1]='book_id'
 aaa$book=paste0(aaa$book_id,"_",aaa$title) 
 books_with_id=select(aaa,book_id,book)
-joined_ratings = left_join(x=ratings,y=books_with_id,by="book_id") 
+joined_ratings = left_join(x=ratings_full,y=books_with_id,by="book_id") 
 
 #we choose the books that are rated >= 4 by user A as A's reading history with satisfaction
 joined_ratings = joined_ratings[which(joined_ratings$rating>=4),]
@@ -288,8 +302,11 @@ summary(transactions)
 rules.Apriori = apriori(data=transactions, parameter = list(supp = 0.03, conf = 0.90, target = "rules",minlen=1,maxlen=10));
 inspect(rules.Apriori)
 
+user_history <- ratings_full[ratings_full$user_id==2304 &ratings_full$rating>=4]
+Book_id_of_history <- as.array(user_history$book_id)
+
 #input some random user's reading history
-basket = as(list(x=c(18,27,278,23,67)),"itemMatrix")
+basket = as(list(x=Book_id_of_history),"itemMatrix")
 basket_subset = as.logical(is.subset(rules.Apriori@lhs,basket))
 inspect(rules.Apriori[basket_subset])
 
@@ -303,29 +320,6 @@ as(top5.rules,'data.frame')
 ```{r}
 #Memory Based Recommendation 
 library(arules)
-ratings <- fread('ratings.csv')
-
-aaa=books
-colnames(aaa)[2]='goodreads_book_ID'
-colnames(aaa)[1]='book_id'
-aaa$book=paste0(aaa$book_id,"_",aaa$title) 
-books_with_id=select(aaa,book_id,book)
-
-#To eliminate running time, we sample the ratings dataset with the top 2000 books and the top 2,000 users
-ratings <- fread('ratings.csv')
-
-#Creating a subset with the top 2000 books and the top 2,000 users
-x = head(data.frame(table(ratings$book_id) %>% sort(decreasing =T)), 2002)
-colnames(x) = c("book_id", "Popularity(Number of ratings)")
-#is(x$book_id[1])
-x$book_id<-as.numeric(as.character(x$book_id))
-the_books = merge(ratings, x, by="book_id")
-
-y = head(data.frame(table(the_books$user_id) %>% sort(decreasing =T)), 2000) 
-colnames(y) = c("user_id", "Number of books this user rated")
-y$user_id <- as.numeric(as.character(y$user_id))
-ratings1 = merge(the_books, y, by="user_id")
-ratings<-ratings1[,1:3]
 
 #to see the distribution of the rating matrix
 ratings[, 'Number of books this user rated' := .N, .(user_id)] 
@@ -503,7 +497,7 @@ plot(results, ylim = c(0,2))
 
 ```{r}
 #select some random user (from 1 to 2000) to do recommendation
-userForPrediction<-99
+userForPrediction<-2001    #2001 for Catalina, 2002 for Yanhan
 #record his/her real user_id
 Real_User_id <-dimension_indices[[1]][userForPrediction]
 ```
@@ -623,18 +617,21 @@ ggplot()+geom_line(data = table,aes(x = n,y = precision,colour = "precision"),si
    xlab("N")+ylab("Rate")
 ```
 
-
 ```{r}
 
 ```
 
 
-```{r}
-
-```
+### some useless code 
 
 ```{r}
-
+#convert the ratings dataset into rating matrix
+library(tidyr)
+dimension_indices <- list(user_id = sort(unique(ratings$user_id)), book_id = sort(unique(ratings$book_id)))
+ratingmat <- spread(select(ratings, book_id, user_id, rating), book_id, rating) %>% select(-user_id) %>% as.matrix()
+dimnames(ratingmat) <- dimension_indices
+ratingmat[1:10, 1:10]
+dim(ratingmat)
 ```
 
 ```{r}
