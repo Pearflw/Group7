@@ -10,125 +10,31 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 rm(list = ls())
 library(data.table)
-books <- fread('books.csv')
-ratings <- fread('ratings.csv')
+library(dplyr)
+library(ggpubr)
+library(arules)
+library(tidyr)
+library("readxl")
+library("gridExtra")
+library("stringr")
+library ("recommenderlab")
+library(reshape2)
 book_tags <- fread('book_tags.csv')
 tags <- fread('tags.csv')
-to_read <- fread('to_read.csv')
-```
-
-
-```{r}
-#install.packages("readxl")
-library("readxl")
-library(gridExtra)
-library("stringr")
+ratings <- fread('ratings.csv')
 books <- read_excel("all_books.xlsx")
 
-#select columns
-library(dplyr)
-books <- books %>% select(id,book_id, work_id, books_count,authors, original_publication_year, title, language_code, average_rating,	work_ratings_count)
-
-#clean language
-table(books$language_code)
-books$language_code[books$language_code == "en-CA"] <- "en"
-books$language_code[books$language_code == "en-GB"] <- "en"
-books$language_code[books$language_code == "en-US"] <- "en"
-books$language_code[books$language_code == "eng"] <- "en"
-```
-
-
-```{r}
-library(ggpubr)
-theme_set(theme_pubr())
-
-temp <- within(books, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
-ggplot(temp,aes(x=language_code))+geom_bar()
-plot1 <-ggplot(data.frame(temp), aes(x=language_code,fill=language_code)) +
-  geom_bar()+
-  labs(x = "language", title = "Including English") +
-  theme_pubclean()+ 
-  theme(legend.position = "none")+
-  coord_flip()
-
-books_wo_english <-books[!grepl("en", books$language_code),]
-temp1 <- within(books_wo_english, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
-plot2<-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
-  geom_bar()+
-  labs(x = "language", title = "Excluding English") +
-  theme_pubclean()+
-  theme(legend.position = "none")+
-  coord_flip()
-
-grid.arrange(plot1, plot2, ncol=2)
-
-# original_publication_year
-hist(books$original_publication_year, col = "blue", main = "Publication year", xlab = " ")
-# book count
-hist(books$books_count, col = "blue", main = "Number of book editions", xlab = " ")
-# Average Rating of books
-hist(books$average_rating, col = "blue", main = "Average Rating", xlab = " ")
-
-hist(books$work_ratings_count, col = "blue", main = "Average Rating", xlab = " ")
-
 ```
 
 ```{r}
-#Genres
-#first merge book_tags and tags
-genres <- merge(book_tags,tags,by="tag_id")
+##################
+# PRE PROCESSING # includes subset selection
+##################
 
-# 2 approaches to genres
-# use the genres provided by goodreads 
-
-goodreads_genres <-(c("Art", "Biography", "Business", "Chick Lit", "Children's", "Christian", "Classics", "Comics", "Contemporary", "Cookbooks", "Crime", "Ebooks", "Fantasy", "Fiction", "Gay and Lesbian", "Graphic Novels", "Historical Fiction", "History", "Horror", "Humor and Comedy", "Manga", "Memoir", "Music", "Mystery", "Nonfiction", "Paranormal", "Philosophy", "Poetry", "Psychology", "Religion", "Romance", "Science", "Science Fiction", "Self Help", "Suspense", "Spirituality", "Sports", "Thriller", "Travel", "Young Adult"))
-
-#str_to_lower(goodreads_genres)  %in% genres$tag_name
-
-c <- goodreads_genres[str_to_lower(goodreads_genres) %in% genres$tag_name]
-
-available_tags <- genres$tag_id[match(str_to_lower(c), genres$tag_name)]
-
-genres <- genres %>% filter(genres$tag_id %in% available_tags)
-#now the dataset contains a book with multiples tags but from the list above
-temp4 <- within(genres, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
-ggplot(temp4,aes(x=tag_name))+geom_bar()
-plot3 <- ggplot(data.frame(temp4), aes(x=tag_name,fill=tag_name)) +
-  geom_bar()+
-  labs(x = " ", title = "Allowing multiple genres") +
-  theme_pubclean()+ 
-  theme(legend.position = "none")+
-  coord_flip()
-
-# select the most popular one
-require(data.table) 
-genres_temp <- as.data.table(genres)
-genres_temp <- genres_temp[genres_temp[, .I[which.max(count)], by=goodreads_book_id]$V1]
-
-temp5 <- within(genres_temp, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
-ggplot(temp5,aes(x=tag_name))+geom_bar()
-plot4 <- ggplot(data.frame(temp5), aes(x=tag_name,fill=tag_name)) +
-  geom_bar()+
-  labs(x = " ", title = "The most popular genre per") +
-  theme_pubclean()+ 
-  theme(legend.position = "none")+
-  coord_flip()
-par(mfrow=c(1,3))
-
-
-grid.arrange(plot3, plot4, ncol=2)
-
-#now use these last genres to match with the book dataset
-final_genres <- genres_temp %>% select(goodreads_book_id, tag_id)
-names(final_genres)[names(final_genres) == "goodreads_book_id"] <- "book_id"
-
-#Final books dataset
-#all_books <- merge(books,final_genres,by="book_id")
-```
-
-```{r}
-#To eliminate running time, we sample the ratings dataset with 3,000 users
-#And based on the rest ratings, we try to get a computationally feasible dataset
+#To achieve a computationally feasible dataset, we first sample from the
+#ratings dataset 3,000 users
+#Then, we remove all books that have less than 30 ratings per book
+#and all users that have rated less than 30 books
 
 #Define a function to make the dataset have good distribution
 Good_subset<- function(dataset){
@@ -148,7 +54,6 @@ Good_subset<- function(dataset){
 return(dataset)
 }
 
-ratings <- fread('ratings.csv')
 y = data.frame(table(ratings$user_id) %>% sort(decreasing =T))
 colnames(y) = c("user_id", "Number of books this user rated")
 set.seed(7)
@@ -156,35 +61,154 @@ indices_y = sample(1:nrow(y), size = 3000, replace = FALSE)
 y <- y[indices_y,]
 y$user_id <- as.numeric(as.character(y$user_id))
 ratings = merge(ratings, y, by="user_id")
-
 ratings <-Good_subset(ratings)
 
-#input ourselves into the rating dataset
-#user_c <- head(ratings,20)
-#user_c$user_id= 66666
-#user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
-#user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
+# Adjust accordingly the books dataset
+#select columns
+books <- books %>% select(id, book_id, books_count,authors, original_publication_year, title, language_code, average_rating,	work_ratings_count)
+#clean language
+table(books$language_code)
+books$language_code[books$language_code == "en-CA"] <- "en"
+books$language_code[books$language_code == "en-GB"] <- "en"
+books$language_code[books$language_code == "en-US"] <- "en"
+books$language_code[books$language_code == "eng"] <- "en"
 
-#user_y <- head(ratings,20)
-#user_y$user_id= 77777
-#user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
-#user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
-
-#ratings<-rbind(ratings,user_c,user_y)
-```
-
-```{r}
 # to create a file with book and its id being combined
 aaa=books
 colnames(aaa)[2]='goodreads_book_ID'
 colnames(aaa)[1]='book_id'
 aaa$book=paste0(aaa$book_id,"_",aaa$title) 
 books_with_id=select(aaa,book_id,book)
+
+#to give a table of books we choose
+The_2000_books<-data.frame(table(ratings$book_id) %>% sort(decreasing =T))
+colnames(The_2000_books) = c("book_id", "Popularity(Number of ratings)")
+books_with_title <- merge(x=The_2000_books,y=books_with_id,by="book_id") %>% select(book_id,book)
+books_with_title$book_id <- as.numeric(as.character(books_with_title$book_id))
+
+#input ourselves into the rating dataset (used for user evaluation)
+# user 77777
+user_c <- head(ratings,30)
+user_c$user_id= 77777
+user_c$book_id <- c(4,95,11,1204,172,180,2144,43,48,5,80,560,1725,10,1015,121,13,55,852,171,193,47,42,736,92,63,33,61,35,8)
+user_c$rating <- c(5,5,5,5,5,5,5,5,5,5,5,4,2,5,5,5,5,5,5,4,4,2,5,5,5,4,4,4,3,2)
+user_c$`Number of books this user rated`<-30
+# see the books rated by user 77777
+see_user_c <-merge(user_c, books_with_title, by="book_id")
+ 
+#user 88888 
+user_a <- head(ratings,30)
+user_a$user_id= 88888
+user_a$book_id <- c(4,95,323,380,1009,14,1454,200,478,125,269,97,284,103,1410,924,63,1320,451,1203,564,590,155,2029,658,804,1725,130,194,977)
+user_a$rating  <- c(5,5,5,5,4,4,4,4,4,3,3,2,1,5,5,5,4,3,3,2,2,1,4,3,3,3,2,1,1,1)
+user_a$`Number of books this user rated`<-30
+# see the books rated by user 88888
+see_user_a <-merge(user_a, books_with_title, by="book_id")
+
+#combine us with the rest
+ratings<-rbind(ratings,user_c,user_a)
+
+# random user 11405
+random_user <-ratings[ratings$user_id == 	11405]
+random_user$book_id <- as.numeric(as.character(random_user$book_id))
+books_with_title$book_id <- as.numeric(as.character(books_with_title$book_id))
+random_user <- merge(random_user, books_with_title, by="book_id")
+
+
+# Now Clean the 'books' dataset for preliminary analysis
+# from the 10k books, seect only the 2430 according to the ratings selection
+# rename book_id to goodreads_book_id to match later with the tags files
+names(books)[names(books)=="book_id"] <- "goodreads_book_id"
+# rename id to book_id to match the books_with title
+names(books)[names(books)=="id"] <- "book_id"
+books <- merge(books, books_with_title, by= "book_id")
+books <- books[,-10]
+
 ```
 
 
 ```{r}
-#Content Based Recommendation
+#########################################
+# Preliminary analysis on books dataset #
+#########################################
+
+theme_set(theme_pubr())
+temp <- within(books, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
+ggplot(temp,aes(x=language_code))+geom_bar()
+plot1 <-ggplot(data.frame(temp), aes(x=language_code,fill=language_code)) +
+  geom_bar()+
+  labs(x = "language", title = "Including English") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")+
+  coord_flip()
+books_wo_english <-books[!grepl("en", books$language_code),]
+temp1 <- within(books_wo_english, language_code <- factor(language_code,levels=names(sort(table(language_code), decreasing=FALSE))))
+plot2<-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
+  geom_bar()+
+  labs(x = "language", title = "Excluding English") +
+  theme_pubclean()+
+  theme(legend.position = "none")+
+  coord_flip()
+grid.arrange(plot1, plot2, ncol=2)
+# original_publication_year
+hist(books$original_publication_year, col = "blue", main = "Publication year", xlab = " ")
+# book count
+hist(books$books_count, col = "blue", main = "Number of book editions", xlab = " ")
+# Average Rating of books
+hist(books$average_rating, col = "blue", main = "Average Rating", xlab = " ")
+hist(books$work_ratings_count, col = "blue", main = "Average Rating", xlab = " ")
+
+
+# Combine 'books' dataset with 'tags' and 'book_tags' (also named Genres)
+
+#first merge book_tags and tags
+genres <- merge(book_tags,tags,by="tag_id")
+genres <- merge(genres,books, by= "goodreads_book_id")
+genres<- genres[,1:4]
+# 2 approaches to genres
+# use the genres provided by goodreads 
+goodreads_genres <-(c("Art", "Biography", "Business", "Chick Lit", "Children's", "Christian", "Classics", "Comics", "Contemporary", "Cookbooks", "Crime", "Ebooks", "Fantasy", "Fiction", "Gay and Lesbian", "Graphic Novels", "Historical Fiction", "History", "Horror", "Humor and Comedy", "Manga", "Memoir", "Music", "Mystery", "Nonfiction", "Paranormal", "Philosophy", "Poetry", "Psychology", "Religion", "Romance", "Science", "Science Fiction", "Self Help", "Suspense", "Spirituality", "Sports", "Thriller", "Travel", "Young Adult"))
+
+c <- goodreads_genres[str_to_lower(goodreads_genres) %in% genres$tag_name]
+available_tags <- genres$tag_id[match(str_to_lower(c), genres$tag_name)]
+genres <- genres %>% filter(genres$tag_id %in% available_tags)
+#now the dataset contains a book with multiples tags but from the list above
+temp4 <- within(genres, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
+plot3 <- ggplot(data.frame(temp4), aes(x=tag_name,fill=tag_name)) +
+  geom_bar()+
+  labs(x = " ", title = "Allowing multiple genres") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")+
+  coord_flip()
+# select the most popular one
+genres_temp <- as.data.table(genres)
+genres_temp <- genres_temp[genres_temp[, .I[which.max(count)], by=goodreads_book_id]$V1]
+temp5 <- within(genres_temp, tag_name <- factor(tag_name,levels=names(sort(table(tag_name), decreasing=FALSE))))
+plot4 <- ggplot(data.frame(temp5), aes(x=tag_name,fill=tag_name)) +
+  geom_bar()+
+  labs(x = " ", title = "The most popular genre per") +
+  theme_pubclean()+ 
+  theme(legend.position = "none")+
+  coord_flip()
+par(mfrow=c(1,3))
+grid.arrange(plot3, plot4, ncol=2)
+
+
+#Final books dataset
+books <- merge(books,genres_temp,by="goodreads_book_id")
+books = subset(books, select = -c(tag_id,count) )
+
+
+```
+
+
+
+
+```{r}
+#################################
+# Content Based Recommendations #
+#################################
+
 books_1 <- fread('books.csv')
 book_tags = fread('book_tags.csv')
 tags = fread('tags.csv')
@@ -205,9 +229,7 @@ bookDF = merge(x= books_1,y=main_tags1,by="goodreads_book_id")
 bookDF = bookDF[,-1,drop=FALSE]
 bookDF = bookDF[,-2:-9,drop=FALSE]
 bookDF = bookDF[,-3:-14,drop=FALSE]
-
 userDF <- ratings
-
 #cluster books based on their genre using k-means, set k = 5
 clusterBooks<-function(bookDF){
   set.seed(11)
@@ -289,91 +311,85 @@ suggestBooks<-function(bookDF, userDF, user_id, no_books){
   #print suggestions
   write.table(suggestions, row.names = FALSE, col.names = FALSE)
 }
-#try with an example: suggest 10 books to user whose ID is 2304
-suggestBooks(bookDF, userDF, 40202, 10)
+#try with an example: suggest 10 books to user whose ID is 11405
+suggestBooks(bookDF, userDF, 11405, 10)
 ```
 
 ```{r}
-#Apriori Algorithm
+#####################
+# Apriori Algorithm #
+#####################
 
-library(arules)
-ratings_full <- fread('ratings.csv')
-
-#input ourselves into the rating dataset
-user_c <- head(ratings_full,20)
-user_c$user_id= 66666
-user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
-user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
-
-user_y <- head(ratings_full,20)
-user_y$user_id= 77777
-user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
-user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
-
-ratings_full<-rbind(ratings_full,user_c,user_y)
-
-joined_ratings = left_join(x=ratings_full,y=books_with_id,by="book_id") 
-
+joined_ratings = left_join(x=ratings,y=books_with_id,by="book_id") 
 #we choose the books that are rated >= 4 by user A as A's reading history with satisfaction
 joined_ratings = joined_ratings[which(joined_ratings$rating>=4),]
-
 #to get the sparse matrix
 tr=split(joined_ratings$book_id,joined_ratings$user_id)
 transactions = as(tr,"transactions")
-summary(transactions)
-
+#summary(transactions)
 #construct Apriori Algorithm
-rules.Apriori = apriori(data=transactions, parameter = list(supp = 0.03, conf = 0.90, target = "rules",minlen=1,maxlen=10));
-inspect(rules.Apriori)
-
-user_history <- ratings_full[ratings_full$user_id==329 &ratings_full$rating>=4]
+rules.Apriori = apriori(data=transactions, 
+                        parameter = list(supp = 0.01, conf = 0.60, target = "rules",minlen=1,maxlen=10));
+#shows the rules found by Apriori
+#inspect(rules.Apriori)
+user_history <- ratings[ratings$user_id==77777 &ratings$rating>=4]
 Book_id_of_history <- as.array(user_history$book_id)
-
 #input some random user's reading history
 basket = as(list(x=Book_id_of_history),"itemMatrix")
-basket_subset = as.logical(is.subset(rules.Apriori@lhs,basket))
-inspect(rules.Apriori[basket_subset])
-
+#choose the rules of which lhs is subset of user's reading history and rhs is not in user's reading history
+basket_subset = as.logical(is.subset(rules.Apriori@lhs,basket)) & !as.logical(is.subset(rules.Apriori@rhs,basket))
 #we choose the best five books to recommond by value of lift
 rules.sorted<-sort(rules.Apriori[basket_subset],by='lift')
-top5.rules<-head(rules.sorted, 5)
+
+#A function that collects all rules with different outputs (choose the rule with highest lift)
+Rules_Collection <- function( SomeRules) {
+  ItemSet <- as(list(x=NA),"itemMatrix")
+  rules <- head(rules.sorted, 0)
+  Max <- length(SomeRules)
+  for (i in 1:Max) {
+    I <- !as.logical(sum(is.subset(SomeRules@rhs[i],ItemSet))>=1)
+    if (I){
+      rules <-union(rules,SomeRules[i])
+      ItemSet <- union(ItemSet,SomeRules@rhs[i])}}
+  return(rules)
+}
+
+Rules_for_User <- Rules_Collection(rules.sorted)
+#shows all the rules with different recommendations for this user
+inspect(Rules_for_User)
+top5.rules<-head(Rules_for_User, 5)
 as(top5.rules,'data.frame')
 
 ```
 
 ```{r}
-#Memory Based Recommendation 
-library(arules)
-
+#Prepare input for the Colaborative filtering method
+#(sparse matrix)
 dimension_indices <- list(user_id = sort(unique(ratings$user_id)), 
                           book_id = sort(unique(ratings$book_id)))
 summary(dimension_indices)
 
-#to give a table of books we choose
-The_2000_books<-data.frame(table(ratings$book_id) %>% sort(decreasing =T))
-colnames(The_2000_books) = c("book_id", "Popularity(Number of ratings)")
-books_with_title <- merge(x=The_2000_books,y=books_with_id,by="book_id") %>% select(book_id,book)
-write.csv(books_with_title,file="books_with_title.csv",quote=F,row.names = F)
-```
-
-```{r}
-library ( "recommenderlab" )
-
-ratings$user_id <- as.numeric(as.factor(ratings$user_id)) 
-ratings$book_id <- as.numeric(as.factor(ratings$book_id)) 
+ratingsForSparseMatrix<-ratings
+ratingsForSparseMatrix$user_id <- as.numeric(as.factor(ratings$user_id)) 
+ratingsForSparseMatrix$book_id <- as.numeric(as.factor(ratings$book_id)) 
 
 #construct sparse matrix
-sparse_ratings <- sparseMatrix(i = ratings$user_id,j = ratings$book_id, x = ratings$rating, dims = c(length(unique(ratings$user_id)), length(unique(ratings$book_id))),dimnames = dimension_indices)
+sparse_ratings <- sparseMatrix(i = ratingsForSparseMatrix$user_id,j = ratingsForSparseMatrix$book_id, x = ratingsForSparseMatrix$rating, dims = c(length(unique(ratingsForSparseMatrix$user_id)), length(unique(ratingsForSparseMatrix$book_id))),dimnames = dimension_indices)
 
 r <- new("realRatingMatrix", data = sparse_ratings) 
+
 sparse_ratings[1:10,1:10]
-#colnames(sparse_ratings)[1:10]
-
-#recommenderRegistry $ get_entry_names ( )    shows all the methods we can use
-
 ```
 
+
 ```{r}
+###################################################
+# Find the best parameters using cross-validation #
+###################################################
+
+########
+# UBCF # n
+########
 #find the best nn for UBCF method. Cross-validation produces more robust results and error estimates.
 ubcf<-data.frame()
 set.seed(7)
@@ -392,8 +408,12 @@ for (i in c(10,20,30,40,50,100)){
   ubcf = rbind(ubcf,ubcf_add) 
 }
 plot(ubcf,type="b")
-
 #the result shows we use nn =30
+
+
+########
+# IBCF #  k
+########
 
 #find the best k for IBCF method. Running this code takes about 15 mins.
 ibcf<-data.frame()
@@ -414,18 +434,21 @@ for (i in c(20,30,50,100,200,500,1000,2000)){
 }
 plot(ibcf,type="b")
 #the result shows we use k =2000
- 
-```
 
-```{r}
+
+########
+# SVDF # lambda
+########
+
 #find the best lambda for SVDF method. Running this code takes about 15 mins.
 SVDF<-data.frame()
 set.seed(7)
 e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
 for (i in c(0.001,0.003,0.005,0.007,0.01)){
   SVDF_add<-data.frame(lambda = 0, test_RMSE=0) 
-  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=10,gamma=0.02,lambda=i,
-                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05))
+  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", 
+                          param=list(k=10,gamma=0.02,lambda=i,
+                                     min_epochs=20,max_epochs=100,min_improvement=1e-05))
   #making predictions on the test data set
   p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
   # obtaining the error metrics for both approaches and comparing them
@@ -436,17 +459,22 @@ for (i in c(0.001,0.003,0.005,0.007,0.01)){
 }
 plot(SVDF,type="b")
 #the result shows we use lambda= 0.005
-```
 
-```{r}
+
+########
+# SVDF # N (number of features)
+########
+
 #find the best number of featrues for SVDF method. Running this code takes about 30 mins.
 SVDF_N<-data.frame()
 set.seed(7)
 e <- evaluationScheme(r, method="cross-validation",k=10, given=-5)
-for (i in c(1,3,5,7,10,13,14,15,16,17,20,30)){
-  SVDF_add<-data.frame(N_features = 0, test_RMSE=0) 
-  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=i,gamma=0.02,lambda=0.005,
-                                                                  min_epochs=1,max_epochs=100,min_improvement=1e-05,verbose=T))
+#e <- evaluationScheme(r, method="split",0.8,k=10, given=-5)
+for (i in c(1,3,5,8,10,20,30)){
+  SVDF_add <- data.frame(N_features = 0, test_RMSE=0) 
+  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", 
+                          param=list(k=i,gamma=0.05,lambda=0.005,
+                                     min_epochs=10,max_epochs=200,min_improvement=1e-06,verbose=T))
   #making predictions on the test data set
   p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
   # obtaining the error metrics for both approaches and comparing them
@@ -454,81 +482,236 @@ for (i in c(1,3,5,7,10,13,14,15,16,17,20,30)){
   SVDF_add$N_features <-i
   SVDF_add$test_RMSE <- test_RMSE_ibcf[1]
   SVDF_N = rbind(SVDF_N,SVDF_add) 
-}  
+}    
 plot(SVDF_N,type="b")
-#the result shows we use number of featrues = 16
+#the result shows we use number of featrues = 8
+
 ```
 
-```{r}
-#find the best number of featrues for SVDF method. Running this code takes about 30 mins.
-SVDF_N<-data.frame()
-set.seed(7)
-e <- evaluationScheme(r, method="split",0.8,k=10, given=-5)
-for (i in c(1,2,3)){
-  SVDF_add<-data.frame(N_features = 0, test_RMSE=0) 
-  Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", param=list(k=i,gamma=0.02,lambda=0.005,
-                                                                  min_epochs=1,max_epochs=100,min_improvement=1e-05,verbose=T))
-  #making predictions on the test data set
-  p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
-  # obtaining the error metrics for both approaches and comparing them
-  test_RMSE_ibcf <-calcPredictionAccuracy(p_SVDF_test, getData(e, "unknown")) 
-  SVDF_add$N_features <-i
-  SVDF_add$test_RMSE <- test_RMSE_ibcf[1]
-  SVDF_N = rbind(SVDF_N,SVDF_add) 
-}  
-plot(SVDF_N,type="b")
-#the result shows we use number of featrues = 10
-```
+
 
 ```{r}
+
+##################################################################
+# compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF #
+##################################################################
+
 #compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
 set.seed(7)
+#Use cross validation for performance measurement
 scheme <- evaluationScheme(r, method="cross-validation", k=10, given=-5, goodRating=4)
+
+#use this to run in one train-test split
+#scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
+
+#list all the methods we are using
 Algorithm <-list("UBCF_30"  = list(name="UBCF", param=list(nn = 30)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "Popular"  = list(name="POPULAR", param=NULL),
                  "Random Items" = list(name="RANDOM", param=NULL),
                  "SVD" = list(name="SVD", param=NULL),
-                 "SVDF"=list(name="SVDF", param=list(k=16,gamma=0.02,lambda=0.005,
-                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05)))
+                 "SVDF"=list(name="SVDF", param=list(k=8,gamma=0.05,lambda=0.005,
+                                                     min_epochs=10,max_epochs=200,min_improvement=1e-06)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
+
+#plot the result
 plot(results, ylim = c(0,2))
-#getConfusionMatrix(results)[[1]]
 ```
 
 ```{r}
-#you can use this code instead, takes only 5 mins
+################################################
+# select some random user to do recommendation #
+################################################
+#input his/her real user_id (make sure it is in the sample rating dataset)
+Real_User_id <-11405
+#record it is place in sparse ratings matrix
+IndexForPrediction<-which(rownames(sparse_ratings)==Real_User_id)
+```
+
+
+```{r}
+###############
+# predictions #
+###############
+
+# Do prediction based on IBCF
+r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 2000))
+# predict 5 books based on IBCF
+pred_IBCF <- predict ( r_recom_IBCF , r [IndexForPrediction] , type="ratings") 
+top_ibcf <- getTopNLists(pred_IBCF, n=5)
+top_IBCF_list <- as(top_ibcf,"list")
+cat('For user with id',Real_User_id,':\n')
+cat('The best 5 books to recommend (Based on IBCF)  are: \n')
+#Print the top 5 books
+for (i in 1:5) {
+  b <- unique(books_with_id$book[books_with_id$book_id == top_IBCF_list[[1]][i]]) 
+  artist <- unique(books$authors[books$book_id == top_IBCF_list[[1]][i]]) 
+  print(paste(b,artist,sep = " - "))
+}
+
+
+# Do prediction based on UBCF 
+r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 30))
+# predict 5 books based on UBCF
+pred_UBCF <- predict ( r_recom_UBCF , r [IndexForPrediction] , type="ratings") 
+top.ubcf <- getTopNLists(pred_UBCF, n=5)
+top_UBCF_list<-as ( top.ubcf , "list" )
+cat('\nFor user with id',Real_User_id,':\n')
+cat('The best 5 books to recommend (Based on UBCF) are: \n')
+#Print the top 5 books
+for (i in 1:5) {
+  b <- unique(books_with_id$book[books_with_id$book_id == top_UBCF_list[[1]][i]]) 
+  artist <- unique(books$authors[books$book_id == top_UBCF_list[[1]][i]]) 
+  print(paste(b,artist,sep = " - "))
+}
+
+# predict 5 books based on FSVD
+# create the FSVD model
+r_recom_SVDF <- Recommender (r, method = "SVDF" , 
+                             param=list(k=8,gamma=0.05,lambda=0.005,
+                                        min_epochs=10,max_epochs=200,min_improvement=1e-06))
+# do predictions
+pred_SVDF <- predict ( r_recom_SVDF , r [IndexForPrediction] , type="ratings") 
+top_SVDF <- getTopNLists(pred_SVDF, n=5)
+top_SVDF_list <- as(top_SVDF,"list")
+cat('\nFor user with id',Real_User_id,':\n')
+cat('The best 5 books to recommend (Based on FSVD)  are: \n')
+#Print the top 5 books
+for (i in 1:5) {
+  b <- unique(books_with_id$book[books_with_id$book_id == top_SVDF_list[[1]][i]]) 
+  artist <- unique(books$authors[books$book_id == top_SVDF_list[[1]][i]]) 
+  print(paste(b,artist,sep = " - "))
+}
+```
+
+```{r}
+# to see the two matrix U and V, run the following code, takes 15 mins
+fsvd<- funkSVD(r, k = 8, gamma = 0.05, lambda = 0.005,
+  min_improvement = 1e-06, min_epochs = 10, max_epochs = 200,
+  verbose = T)
+#fsvd$U
+#fsvd$V
+```
+
+
+```{r}
+########################################
+# test the 3 methods: IBCF, UBCF, SVDF #
+########################################
 set.seed(7)
-scheme <- evaluationScheme(r, method="split", train=0.9, given=-5, goodRating=4)
-Algorithm <-list("UBCF_30"  = list(name="UBCF", param=list(nn = 30)),
-                 "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
-                 "Popular"  = list(name="POPULAR", param=NULL),
-                 "Random Items" = list(name="RANDOM", param=NULL),
-                 "SVD" = list(name="SVD", param=NULL),
-                 "SVDF"=list(name="SVDF", param=list(k=16,gamma=0.02,lambda=0.005,
-                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05)))
-results <- evaluate(scheme, Algorithm , type = "ratings")
-plot(results, ylim = c(0,2))
+scheme <- evaluationScheme(r, method="split", train=0.8 , given=-5,  goodRating=5)
+results_IBCF <- evaluate(scheme, method="IBCF",param=list(k  = 2000), type = "topNList",  n=c(3,5,10,15,20,30))
+results_UBCF <- evaluate(scheme, method="UBCF",param=list(nn = 30)  , type = "topNList",  n=c(3,5,10,15,20,30))
+results_SVDF <- evaluate(scheme, method="SVDF",
+                         param=list(k = 8,gamma = 0.05,lambda= 0.005,
+                                    min_epochs = 10,max_epochs = 200,
+                                    min_improvement = 1e-06), type = "topNList", n = c(3,5,10,15,20,30))
+cat('The performance of IBCF is : \n')
+getConfusionMatrix(results_IBCF)[[1]]
+cat('\nThe performance of UBCF is : \n')
+getConfusionMatrix(results_UBCF)[[1]]
+cat('\nThe performance of SVDF is : \n')
+getConfusionMatrix(results_SVDF)[[1]]
+
+######################################
+# plot the precision and recall rate #
+######################################
+table1<- as.data.frame(getConfusionMatrix(results_IBCF)[[1]][,c('precision','recall'),drop=F])
+table2<- as.data.frame(getConfusionMatrix(results_UBCF)[[1]][,c('precision','recall'),drop=F])
+table3<- as.data.frame(getConfusionMatrix(results_SVDF)[[1]][,c('precision','recall'),drop=F])
+
+table_precision <- cbind(table1[,1],table2[,1],table3[,1])
+colnames(table_precision) <- c('IBCF','UBCF','SVDF')
+table_precision <-as.data.frame(table_precision)
+table_precision$N <- as.factor(c(3,5,10,15,20,30))
+
+table_recall <- cbind(table1[,2],table2[,2],table3[,2])
+colnames(table_recall) <- c('IBCF','UBCF','SVDF')
+table_recall <-as.data.frame(table_recall)
+table_recall$N <- as.factor(c(3,5,10,15,20,30))
+
+Comparision <- function(df,txt){
+dfm <- melt(df[,c('N','IBCF','UBCF','SVDF')],id.vars = 1)
+ggplot(data=dfm, aes(x=N, y=value, fill=variable)) +
+    geom_bar(colour="black", stat="identity",
+             position=position_dodge(),size=.3) +                        
+    xlab("Number of recommendations") + ylab("Rate") +
+    ggtitle(txt) + theme_bw()
+}
+
+Comparision(as.data.frame(table_precision),'Precision for 3 methods')
+Comparision(as.data.frame(table_recall),'Recall for 3 methods')
+
 ```
 
 ```{r}
-#select some random user (from 1 to 2000) to do recommendation
-userForPrediction<-2002    #2001 for Catalina, 2002 for Yanhan
-#record his/her real user_id
-Real_User_id <-dimension_indices[[1]][userForPrediction]
+
 ```
 
+
+### some useless codes
+
+```{r}
+#convert the ratings dataset into rating matrix
+dimension_indices <- list(user_id = sort(unique(ratings$user_id)), book_id = sort(unique(ratings$book_id)))
+ratingmat <- spread(select(ratings, book_id, user_id, rating), book_id, rating) %>% select(-user_id) %>% as.matrix()
+dimnames(ratingmat) <- dimension_indices
+ratingmat[1:10, 1:10]
+dim(ratingmat)
+```
+
+```{r}
+#input ourselves into the rating dataset
+user_c <- head(ratings,20)
+user_c$user_id= 66666
+user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
+user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
+user_y <- head(ratings,20)
+user_y$user_id= 77777
+user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
+user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
+ratings<-rbind(ratings,user_c,user_y)
+```
+
+
+```{r}
+#Memory Based Recommendation 
+
+#to see the distribution of the rating matrix
+ratings[, 'Number of books this user rated' := .N, .(user_id)] 
+ratings[, 'Popularity(Number of ratings)' := .N, .(book_id)]
+dim(ratings[ratings$user_id==52036,])
+ratings[ratings$user_id==901,]
+dimension_indices <- list(user_id = sort(unique(ratings$user_id)), 
+                          book_id = sort(unique(ratings$book_id)))
+#unique(ratings$book_id)
+summary(dimension_indices)
+#to give a table of books we choose
+The_2000_books<-data.frame(table(ratings$book_id) %>% sort(decreasing =T))
+colnames(The_2000_books) = c("book_id", "Popularity(Number of ratings)")
+books_with_title <- merge(x=The_2000_books,y=books_with_id,by="book_id")
+```
+
+```{r}
+
+ratings$user_id <- as.numeric(as.factor(ratings$user_id)) 
+ratings$book_id <- as.numeric(as.factor(ratings$book_id)) 
+#construct sparse matrix
+sparse_ratings <- sparseMatrix(i = ratings$user_id,j = ratings$book_id, x = ratings$rating, dims = c(length(unique(ratings$user_id)), length(unique(ratings$book_id))),dimnames = dimension_indices)
+r <- new("realRatingMatrix", data = sparse_ratings) 
+sparse_ratings[1:10,1:10]
+colnames(sparse_ratings)[1:10]
+#recommenderRegistry $ get_entry_names ( )    shows all the methods we can use
+```
 
 ```{r}
 # Do prediction based on IBCF
 r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 2000))
-
 # predict 5 books based on IBCF
 pred_IBCF <- predict ( r_recom_IBCF , r [userForPrediction] , type="ratings") 
 top_ibcf <- getTopNLists(pred_IBCF, n=5)
 top_IBCF_list <- as(top_ibcf,"list")
-
 cat('For user with id',Real_User_id,':\n')
 cat('The best 5 books to recommend (Based on IBCF)  are: \n')
 for (i in 1:5) {
@@ -536,25 +719,30 @@ for (i in 1:5) {
   artist <- unique(books$authors[books$id == top_IBCF_list[[1]][i]]) 
   print(paste(b,artist,sep = " - "))
 }
-
 cat('\n For user with id',Real_User_id,':\n')
 cat('The best 5 books to recommend (Based on UBCF) are: \n')
-
 # Do prediction based on UBCF 
-
-r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 30))
+r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 40))
 # predict 5 books based on UBCF
 pred_UBCF <- predict ( r_recom_UBCF , r [userForPrediction] , type="ratings") 
 top.ubcf <- getTopNLists(pred_UBCF, n=5)
 top_UBCF_list<-as ( top.ubcf , "list" )
-
 for (i in 1:5) {
   b <- unique(books_with_id$book[books_with_id$book_id == top_UBCF_list[[1]][i]]) 
   artist <- unique(books$authors[books$id == top_UBCF_list[[1]][i]]) 
   print(paste(b,artist,sep = " - "))
 }
-
 ```
+
+
+```{r}
+z <- data.frame(table(ratings1$book_id) %>% sort(decreasing =T))
+colnames(z) = c("book_id", "Popularity(Number of ratings)")
+z <- z[z$`Popularity(Number of ratings)`>=20,]
+z$book_id<-as.numeric(as.character(z$book_id))
+ratings2 <- merge(ratings1, z, by="book_id")
+```
+
 
 ```{r}
 # predict 5 books based on SVD
@@ -574,269 +762,23 @@ for (i in 1:5) {
 ```
 
 ```{r}
-# predict 5 books based on FSVD
-# create the FSVD model
-
-r_recom_SVDF <- Recommender (r, method = "SVDF" , param=list(k=16,gamma=0.02,lambda=0.005,
-                                                                  min_epochs=20,max_epochs=100,min_improvement=1e-05))
-# do predictions
-pred_SVDF <- predict ( r_recom_SVDF , r [userForPrediction] , type="ratings") 
-top_SVDF <- getTopNLists(pred_SVDF, n=5)
-top_SVDF_list <- as(top_SVDF,"list")
-cat('For user with id',Real_User_id,':\n')
-cat('The best 5 books to recommend (Based on FSVD)  are: \n')
-for (i in 1:5) {
-  b <- unique(books_with_id$book[books_with_id$book_id == top_SVDF_list[[1]][i]]) 
-  artist <- unique(books$authors[books$id == top_SVDF_list[[1]][i]]) 
-  print(paste(b,artist,sep = " - "))
-}
-```
-
-```{r}
-# to see the two matrix U and V, run the following code, takes 15 mins
-fsvd<- funkSVD(r, k = 16, gamma = 0.02, lambda = 0.005,
-  min_improvement = 1e-05, min_epochs = 20, max_epochs = 100,
-  verbose = T)
-#fsvd$U
-#fsvd$V
-```
-
-
-```{r}
-scheme <- evaluationScheme(r, method="split", 0.8 , given=-5,  goodRating=5)
-
-results_IBCF <- evaluate(scheme, method="IBCF",param=list(k  = 2000), type = "topNList",  n=c(3,5,10,15,20))
-results_UBCF <- evaluate(scheme, method="UBCF",param=list(nn = 30)  , type = "topNList",  n=c(3,5,10,15,20))
-results_SVDF <- evaluate(scheme, method="SVDF",param=list(k=16,gamma=0.02,lambda=0.005,
-                                                          min_epochs=20,max_epochs=100,min_improvement=1e-05),
-                         type = "topNList",  n=c(3,5,10,15,20))
-cat('The performance of IBCF is : \n')
-getConfusionMatrix(results_IBCF)[[1]]
-cat('\nThe performance of UBCF is : \n')
-getConfusionMatrix(results_UBCF)[[1]]
-cat('\nThe performance of SVDF is : \n')
-getConfusionMatrix(results_SVDF)[[1]]
-```
-
-```{r}
-table<- as.data.frame(getConfusionMatrix(results_SVDF)[[1]][,c('precision','recall'),drop=F])
+plot_results <- function(results) {
+table<- as.data.frame(getConfusionMatrix(results)[[1]][,c('precision','recall'),drop=F])
 table <- cbind(table,n=as.numeric(rownames(table)))
 table
-
 plot(table$n,table$precision,col='red',type="b",ylim=c(0,0.08),xlab = "n",ylab ="precision")
 lines(table$n,table$recall,col='blue',type="b")
 legend("topright",pch=c(15,15),legend=c("precision","recall"),col=c('red','blue'),bty="n")
+
 
 ggplot()+geom_line(data = table,aes(x = n,y = precision,colour = "precision"),size=1)+
   geom_point(data = table,aes(x = n,y = precision,colour = "precision"),size=2)+
   geom_line(data = table,aes(x = n,y = recall,colour ="recall"),size=1) + 
   geom_point(data = table,aes(x = n,y = recall,colour = "recall"),size=2) +
-   xlab("N")+ylab("Rate")
-```
-
-```{r}
-
-```
-
-
-### some useless code 
-
-```{r}
-#convert the ratings dataset into rating matrix
-library(tidyr)
-dimension_indices <- list(user_id = sort(unique(ratings$user_id)), book_id = sort(unique(ratings$book_id)))
-ratingmat <- spread(select(ratings, book_id, user_id, rating), book_id, rating) %>% select(-user_id) %>% as.matrix()
-dimnames(ratingmat) <- dimension_indices
-ratingmat[1:10, 1:10]
-dim(ratingmat)
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-ratings <- fread('ratings.csv')
-
-```
-
-
-```{r}
-#input ourselves into the rating dataset
-user_c <- head(ratings,20)
-user_c$user_id= 66666
-user_c$book_id <- c(10,1015,11,4,5,8,13,33,42,43,48,55,66,35,172,121,180,68,257,61)
-user_c$rating <- c(4,5,5,5,4,1,5,5,5,5,5,5,4,3,5,5,5,3,3,4)
-
-user_y <- head(ratings,20)
-user_y$user_id= 77777
-user_y$book_id <- c(5,94,80,1,59,106,128,247,11,67,863,130,10,439,162,359,635,2,103,514)
-user_y$rating  <- c(5,5,5,5,4,4,4,4,5,4,4,5,3,4,5,4,3,5,4,5)
-
-ratings<-rbind(ratings,user_c,user_y)
-```
-
-
-```{r}
-#Memory Based Recommendation 
-library(arules)
-
-#to see the distribution of the rating matrix
-ratings[, 'Number of books this user rated' := .N, .(user_id)] 
-ratings[, 'Popularity(Number of ratings)' := .N, .(book_id)]
-
-dim(ratings[ratings$user_id==52036,])
-ratings[ratings$user_id==901,]
-
-dimension_indices <- list(user_id = sort(unique(ratings$user_id)), 
-                          book_id = sort(unique(ratings$book_id)))
-#unique(ratings$book_id)
-
-summary(dimension_indices)
-
-#to give a table of books we choose
-The_2000_books<-data.frame(table(ratings$book_id) %>% sort(decreasing =T))
-colnames(The_2000_books) = c("book_id", "Popularity(Number of ratings)")
-books_with_title <- merge(x=The_2000_books,y=books_with_id,by="book_id")
-
-```
-
-```{r}
-library ( "recommenderlab" )
-
-ratings$user_id <- as.numeric(as.factor(ratings$user_id)) 
-ratings$book_id <- as.numeric(as.factor(ratings$book_id)) 
-
-#construct sparse matrix
-sparse_ratings <- sparseMatrix(i = ratings$user_id,j = ratings$book_id, x = ratings$rating, dims = c(length(unique(ratings$user_id)), length(unique(ratings$book_id))),dimnames = dimension_indices)
-
-r <- new("realRatingMatrix", data = sparse_ratings) 
-sparse_ratings[1:10,1:10]
-colnames(sparse_ratings)[1:10]
-
-#recommenderRegistry $ get_entry_names ( )    shows all the methods we can use
-
-```
-
-```{r}
-# Do prediction based on IBCF
-r_recom_IBCF <- Recommender ( r , method = "IBCF" , param=list(k  = 2000))
-
-# predict 5 books based on IBCF
-pred_IBCF <- predict ( r_recom_IBCF , r [userForPrediction] , type="ratings") 
-top_ibcf <- getTopNLists(pred_IBCF, n=5)
-top_IBCF_list <- as(top_ibcf,"list")
-
-cat('For user with id',Real_User_id,':\n')
-cat('The best 5 books to recommend (Based on IBCF)  are: \n')
-for (i in 1:5) {
-  b <- unique(books_with_id$book[books_with_id$book_id == top_IBCF_list[[1]][i]]) 
-  artist <- unique(books$authors[books$id == top_IBCF_list[[1]][i]]) 
-  print(paste(b,artist,sep = " - "))
+   xlab("Number of recommendations")+ylab("Rate")
 }
-
-cat('\n For user with id',Real_User_id,':\n')
-cat('The best 5 books to recommend (Based on UBCF) are: \n')
-
-# Do prediction based on UBCF 
-
-r_recom_UBCF <- Recommender ( r , method = "UBCF" , param=list(nn = 40))
-# predict 5 books based on UBCF
-pred_UBCF <- predict ( r_recom_UBCF , r [userForPrediction] , type="ratings") 
-top.ubcf <- getTopNLists(pred_UBCF, n=5)
-top_UBCF_list<-as ( top.ubcf , "list" )
-
-for (i in 1:5) {
-  b <- unique(books_with_id$book[books_with_id$book_id == top_UBCF_list[[1]][i]]) 
-  artist <- unique(books$authors[books$id == top_UBCF_list[[1]][i]]) 
-  print(paste(b,artist,sep = " - "))
-}
-
+plot_results(results_IBCF)
+plot_results(results_UBCF)
+plot_results(results_SVDF)
 ```
-
-
-```{r}
-z <- data.frame(table(ratings1$book_id) %>% sort(decreasing =T))
-colnames(z) = c("book_id", "Popularity(Number of ratings)")
-z <- z[z$`Popularity(Number of ratings)`>=20,]
-z$book_id<-as.numeric(as.character(z$book_id))
-ratings2 <- merge(ratings1, z, by="book_id")
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
 
