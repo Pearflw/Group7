@@ -209,9 +209,6 @@ books = subset(books, select = -c(tag_id,count) )
 # Content Based Recommendations #
 #################################
 
-#################################
-# Content Based Recommendations #
-#################################
 books_1 <- books
 main_tags_labels<- str_to_lower(goodreads_genres)
 #map two tables together by tag_id
