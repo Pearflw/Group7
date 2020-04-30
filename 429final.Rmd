@@ -636,12 +636,12 @@ dfm <- melt(df[,c('N','IBCF','UBCF','SVDF')],id.vars = 1)
 ggplot(data=dfm, aes(x=N, y=value, fill=variable)) +
     geom_bar(colour="black", stat="identity",
              position=position_dodge(),size=.3) +                        
-    xlab("Number of recommendations") + ylab("Rate") +
-    ggtitle(txt) + theme_bw()
+    xlab("Number of recommendations") + ylab(paste(txt,"Rate")) +
+    ggtitle(paste(txt,"for 3 methods")) + theme_bw()
 }
 
-Comparision(as.data.frame(table_precision),'Precision for 3 methods')
-Comparision(as.data.frame(table_recall),'Recall for 3 methods')
+Comparision(as.data.frame(table_precision),'Precision')
+Comparision(as.data.frame(table_recall),'Recall')
 
 ```
 
