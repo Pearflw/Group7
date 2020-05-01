@@ -493,10 +493,8 @@ plot(SVDF_N,type="b")
 ```{r}
 
 ##################################################################
-# compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF #
+# compare 5 methods :UBCF, IBCF, Popular, Random items, SVDF #
 ##################################################################
-
-#compare 6 methods :UBCF, IBCF, Popular, Random items,SVD, SVDF
 #Running this code takes about 15-20 mins.
 set.seed(7)
 #Use cross validation for performance measurement
@@ -510,13 +508,12 @@ Algorithm <-list("UBCF_30"  = list(name="UBCF", param=list(nn = 30)),
                  "IBCF_2000"  = list(name="IBCF", param=list(k  = 2000)),
                  "Popular"  = list(name="POPULAR", param=NULL),
                  "Random Items" = list(name="RANDOM", param=NULL),
-                 "SVD" = list(name="SVD", param=NULL),
                  "SVDF"=list(name="SVDF", param=list(k=8,gamma=0.05,lambda=0.005,
                                                      min_epochs=10,max_epochs=200,min_improvement=1e-06)))
 results <- evaluate(scheme, Algorithm , type = "ratings")
-
 #plot the result
 plot(results, ylim = c(0,2))
+
 ```
 
 ```{r}
