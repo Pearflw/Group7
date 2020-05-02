@@ -487,9 +487,9 @@ end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken # 58.23097 mins
 
-##################################################################
+#####################################################
 # compare 4 methods :UBCF, IBCF, Random items, SVDF #
-##################################################################
+#####################################################
 #Running this code takes about 15-20 mins.
 set.seed(7)
 #Use cross validation for performance measurement
