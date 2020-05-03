@@ -151,13 +151,20 @@ plot2<-ggplot(data.frame(temp1), aes(x=language_code,fill=language_code)) +
   coord_flip()
 grid.arrange(plot1, plot2, ncol=2)
 # original_publication_year
-hist(books$original_publication_year, col = "blue", main = "Publication year", xlab = " ")
-# book count
-hist(books$books_count, col = "blue", main = "Number of book editions", xlab = " ")
+hist(books$original_publication_year, col = "#56B4E9", main = "Publication year", xlab = " ")
+# book count, Number of book editions
+hist(books$books_count, col = "#56B4E9", main = "Number of book editions", xlab = " ")
 # Average Rating of books
-hist(books$average_rating, col = "blue", main = "Average Rating", xlab = " ")
-hist(books$work_ratings_count, col = "blue", main = "Average Rating", xlab = " ")
-
+hist(books$average_rating, col = "#56B4E9", main = "Average Rating", xlab = " ")
+# Ratings distribution
+hist(ratings$rating, col = "#56B4E9", main = " Ratings distribution", xlab = " ")
+ratings_for_plot=ratings
+# Number of books a user has rated
+ratings_for_plot[, 'Number of books a user has rated' := .N, .(user_id)] 
+hist(ratings_for_plot$'Number of books a user has rated', col = "#56B4E9", main = "Number of books a user has rated", xlab = " ")
+# Number of ratings per book
+ratings_for_plot[, 'Popularity(Number of ratings per book)' := .N, .(book_id)]
+hist(ratings_for_plot$'Popularity(Number of ratings per book)', col = "#56B4E9", main = "Number of ratings per book", xlab = " ")
 
 # Combine 'books' dataset with 'tags' and 'book_tags' (also named Genres)
 
@@ -466,7 +473,7 @@ start.time <- Sys.time()
 for (i in c(0.001,0.003,0.005,0.007,0.01)){
   SVDF_add<-data.frame(lambda = 0, test_RMSE=0) 
   Rec.SVDF <- Recommender(getData(e, "train"), "SVDF", 
-                          param=list(k=10,gamma=0.02,lambda=i,
+                          param=list(k=10,gamma=0.05,lambda=i,
                                      min_epochs=20,max_epochs=100,min_improvement=1e-05))
   #making predictions on the test data set
   p_SVDF_test <- predict(Rec.SVDF, getData(e, "known"), type="ratings")
